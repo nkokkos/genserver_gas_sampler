@@ -187,13 +187,9 @@ defmodule SampleSensor do
     |> min(10_000.0)
   end
 
-  defp median(samples) do
+ defp median(samples) do
     sorted = Enum.sort(samples)
-    count  = length(sorted)
-    mid    = div(count, 2)
- 
-    # Odd count → single middle value
-    Enum.at(sorted, mid)
+    Enum.at(sorted, div(length(sorted), 2))
   end
 
 
