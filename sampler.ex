@@ -35,6 +35,153 @@ defmodule SampleSensor do
   @config_msb 0xC5
   @config_lsb 0x83
 
+  # Timing
+  @conversion_ms  130     # 125ms conversion + 5ms margin
+  @total_window   5_000   # 5 second window
+  @num_samples    7       # odd number for clean median
+  @sample_interval div(@total_window, @num_samples)  # 714ms
+ 
+  # Sensor calibration
+  # Update sensitivity using the label from the sensor!
+  @sensitivity_na_per_ppm  1.827      # enter arbitrary value
+  @r3_ohms                 1_200_000  # value of feedback resistor in Ohms
+  @divider_factor          2.0        # undo ×0.5 voltage divide. Note that we used the voltage divider before sampling. We used a 2 MGOhn resistors to create a voltage divider.
+
+
+  # ── Public API ──────────────────────────────────────────
+ 
+  def start_link(opts \\ []) do
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  end
+ 
+  @doc "Returns current CO reading in ppm from state variable"
+  def get_ppm do
+    GenServer.call(__MODULE__, :get_ppm)
+  end
+ 
+  @doc "Returns full state for debugging"
+  def get_state do
+    GenServer.call(__MODULE__, :get_state)
+  end
+ 
+  # ── GenServer Callbacks ──────────────────────────────────
+ 
+  @impl true
+  def init(_opts) do
+    # Open I2C bus
+    {:ok, ref} = Circuits.I2C.open("i2c-1")
+ 
+    state = %{
+      i2c:     ref,
+      ppm:     0.0,
+      samples: [],
+      status:  :ok
+    }
+ 
+    # Start first sample immediately
+    send(self(), :collect_sample)
+ 
+    Logger.info("CoSensor started")
+    {:ok, state}
+  end
+ 
+  @impl true
+  def handle_call(:get_ppm, _from, state) do
+    {:reply, state.ppm, state}
+  end
+ 
+  @impl true
+  def handle_call(:get_state, _from, state) do
+    {:reply, state, state}
+  end
+ 
+  @impl true
+  def handle_info(:collect_sample, state) do
+    case read_ads1115(state.i2c) do
+      {:ok, ppm} ->
+        samples = [ppm | state.samples]
+ 
+        if length(samples) >= @num_samples do
+          # Array full → apply median filter → update state
+          filtered_ppm = median(samples)
+ 
+          Logger.info("CO reading: #{Float.round(filtered_ppm, 1)} ppm")
+ 
+          # Schedule next window
+          Process.send_after(self(), :collect_sample, @sample_interval)
+ 
+          {:noreply, %{state | ppm: filtered_ppm, samples: [], status: :ok}}
+        else
+          # More samples needed → schedule next sample
+          Process.send_after(self(), :collect_sample, @sample_interval)
+ 
+          {:noreply, %{state | samples: samples}}
+        end
+ 
+      {:error, reason} ->
+        Logger.error("ADS1115 read error: #{inspect(reason)}")
+ 
+        # Retry after interval
+        Process.send_after(self(), :collect_sample, @sample_interval)
+ 
+        {:noreply, %{state | status: {:error, reason}}}
+    end
+  end
+ 
+  # ── Private Functions ────────────────────────────────────
+ 
+  defp read_ads1115(ref) do
+    with :ok <- trigger_conversion(ref),
+         :ok <- Process.sleep(@conversion_ms) |> then(fn _ -> :ok end),
+         {:ok, raw} <- read_conversion(ref) do
+      ppm = raw_to_ppm(raw)
+      {:ok, ppm}
+    end
+  end
+ 
+  defp trigger_conversion(ref) do
+    Circuits.I2C.write(ref, @ads1115_addr, <<@reg_config, @config_msb, @config_lsb>>)
+  end
+ 
+  defp read_conversion(ref) do
+    with :ok <- Circuits.I2C.write(ref, @ads1115_addr, <<@reg_conversion>>),
+         {:ok, <<msb, lsb>>} <- Circuits.I2C.read(ref, @ads1115_addr, 2) do
+      # Convert to signed 16-bit integer
+      raw = msb <<< 8 ||| lsb
+      raw = if raw > 32767, do: raw - 65536, else: raw
+      {:ok, raw}
+    end
+  end
+ 
+  defp raw_to_ppm(raw) do
+    # Step 1: raw ADC to millivolts (PGA ±2.048V = 0.0625mV per bit)
+    mv = raw * 0.0625
+ 
+    # Step 2: millivolts to volts
+    voltage_diff = mv / 1000.0
+ 
+    # Step 3: undo ×0.5 voltage divider (R6/R7 and R8/R9)
+    actual_diff = voltage_diff * @divider_factor
+ 
+    # Step 4: convert to ppm
+    # ppm = actual_diff / (sensitivity_A/ppm × R3)
+    sensitivity_amps = @sensitivity_na_per_ppm * 1.0e-9
+    ppm = actual_diff / (sensitivity_amps * @r3_ohms)
+ 
+    # Clamp to valid range
+    ppm
+    |> max(0.0)
+    |> min(10_000.0)
+  end
+ 
+  defp median(samples) do
+    sorted = Enum.sort(samples)
+    count  = length(sorted)
+    mid    = div(count, 2)
+ 
+    # Odd count → single middle value
+    Enum.at(sorted, mid)
+  end
 
 
 end
