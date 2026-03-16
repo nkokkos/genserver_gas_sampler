@@ -143,18 +143,32 @@ defmodule SampleSensor do
     Circuits.I2C.write(ref, @ads1115_addr, <<@reg_config, @config_msb, @config_lsb>>)
   end
  
+  #defp read_conversion(ref) do
+  #  with :ok <- Circuits.I2C.write(ref, @ads1115_addr, <<@reg_conversion>>),
+  #       {:ok, <<msb, lsb>>} <- Circuits.I2C.read(ref, @ads1115_addr, 2) do
+  #    # Convert to signed 16-bit integer
+  #    raw = msb <<< 8 ||| lsb
+  #    raw = if raw > 32767, do: raw - 65536, else: raw
+  #    {:ok, raw}
+  #  end
+  #end
+
+  # Reimplement read_conversion with atomic write_read!
+  # Read this blog post where Frank talks about contention: https://elixirforum.com/t/do-we-need-to-write-linux-i2c-bus-atomic-operation-by-ourselves/64031/3
+  # Just do atomic read just to be safe:
   defp read_conversion(ref) do
-    with :ok <- Circuits.I2C.write(ref, @ads1115_addr, <<@reg_conversion>>),
-         {:ok, <<msb, lsb>>} <- Circuits.I2C.read(ref, @ads1115_addr, 2) do
-      # Convert to signed 16-bit integer
-      raw = msb <<< 8 ||| lsb
-      raw = if raw > 32767, do: raw - 65536, else: raw
-      {:ok, raw}
-    end
+    raw_bytes = Circuits.I2C.write_read!(ref, @ads1115_addr, <<@reg_conversion>>, 2)
+    <<msb, lsb>> = raw_bytes
+    raw = msb <<< 8 ||| lsb
+    raw = if raw > 32767, do: raw - 65536, else: raw
+    {:ok, raw}
+  rescue
+    e -> {:error, e}
   end
  
   defp raw_to_ppm(raw) do
     # Step 1: raw ADC to millivolts (PGA ±2.048V = 0.0625mV per bit)
+    # For more details, just read the ads1115 adc datasheet:
     mv = raw * 0.0625
  
     # Step 2: millivolts to volts
@@ -173,7 +187,7 @@ defmodule SampleSensor do
     |> max(0.0)
     |> min(10_000.0)
   end
- 
+
   defp median(samples) do
     sorted = Enum.sort(samples)
     count  = length(sorted)
