@@ -35,9 +35,11 @@ defmodule SampleSensor do
   @config_msb 0xC5
   @config_lsb 0x83
 
-  # Timing
+  # We use the default = 8 SPS (samples per second), therefore,
+  # Conversion time = 1/8 = 125ms
+
   @conversion_ms  130     # 125ms conversion + 5ms margin
-  @total_window   5_000   # 5 second window
+  @total_window   5_000   # 5 second window. We will be sampling 7 times over the period of 5 seconds.
   @num_samples    7       # odd number for clean median
   @sample_interval div(@total_window, @num_samples)  # 714ms
  
@@ -94,40 +96,37 @@ defmodule SampleSensor do
   def handle_call(:get_state, _from, state) do
     {:reply, state, state}
   end
- 
+
   @impl true
   def handle_info(:collect_sample, state) do
-    case read_ads1115(state.i2c) do
-      {:ok, ppm} ->
-        samples = [ppm | state.samples]
- 
-        if length(samples) >= @num_samples do
-          # Array full → apply median filter → update state
-          filtered_ppm = median(samples)
- 
-          Logger.info("CO reading: #{Float.round(filtered_ppm, 1)} ppm")
- 
-          # Schedule next window
-          Process.send_after(self(), :collect_sample, @sample_interval)
- 
-          {:noreply, %{state | ppm: filtered_ppm, samples: [], status: :ok}}
-        else
-          # More samples needed → schedule next sample
-          Process.send_after(self(), :collect_sample, @sample_interval)
- 
-          {:noreply, %{state | samples: samples}}
-        end
- 
-      {:error, reason} ->
-        Logger.error("ADS1115 read error: #{inspect(reason)}")
- 
-        # Retry after interval
-        Process.send_after(self(), :collect_sample, @sample_interval)
- 
-        {:noreply, %{state | status: {:error, reason}}}
-    end
+    new_state =
+      case read_ads1115(state.i2c) do
+        {:ok, ppm} ->
+          # Add new sample to window
+          # Keep only last 7 samples (sliding!)
+          window =
+            [ppm | state.window]num_samples
+            |> Enum.take(@num_samples)
+
+          # Output median only when window is full
+          filtered_ppm =
+            if length(window) == @num_samples do
+              median(window)
+            else
+              state.ppm
+            end
+
+          %{state | ppm: filtered_ppm, window: window}
+
+        {:error, _reason} ->
+          state
+      end
+
+    Process.send_after(self(), :collect_sample, @sample_interval)
+    {:noreply, new_state}
   end
- 
+
+
   # ── Private Functions ────────────────────────────────────
  
   defp read_ads1115(ref) do
