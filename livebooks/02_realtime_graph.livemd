@@ -1,0 +1,328 @@
+# Gas Sensor Monitor - Real-Time Graph
+
+## Introduction
+
+This Livebook creates a real-time line graph of gas sensor PPM readings. The graph updates automatically, showing the last 60 seconds of data.
+
+## Setup
+
+Configure connection and start the visualization:
+
+```elixir
+# Configuration
+pi_ip = "192.168.1.45"  # Change to your Pi's IP
+cookie = "gassensor_demo_cookie_2024"
+local_ip = "192.168.1.100"  # Change to your laptop's IP
+
+# Start distributed node
+Node.start(:"livebook@#{local_ip}", :shortnames)
+Node.set_cookie(String.to_atom(cookie))
+
+# Connect to Pi
+target_node = :"sampler@#{pi_ip}"
+Node.connect(target_node)
+
+# Verify connection
+connected? = target_node in Node.list()
+
+if connected? do
+  Kino.Markdown.new("""### ✅ Connected to #{target_node}""")
+else
+  Kino.Markdown.new("""### ❌ Failed to connect. Check network and try again.""")
+end
+```
+
+## Real-Time PPM Graph
+
+This section creates a live-updating line chart showing PPM values over time.
+
+```elixir
+# Create a frame to hold the chart
+chart_frame = Kino.Frame.new()
+
+# Data buffer (stores last 60 seconds of readings)
+data_buffer = Kino.Broadcast.new("ppm_data")
+
+# Initialize empty dataset
+dataset = []
+
+# Function to fetch data and update chart
+update_chart = fn current_data ->
+  # Fetch reading from Pi
+  reading = :rpc.call(target_node, GasSensor.ReadingAgent, :get_reading, [])
+  timestamp = Time.utc_now()
+  
+  # Add new data point
+  new_point = %{time: timestamp, ppm: reading.ppm, status: reading.status}
+  updated_data = current_data ++ [new_point]
+  
+  # Keep only last 60 points (60 seconds at 1 sample/sec)
+  trimmed_data = if length(updated_data) > 60 do
+    Enum.drop(updated_data, length(updated_data) - 60)
+  else
+    updated_data
+  end
+  
+  # Create Vega-Lite chart
+  chart = VegaLite.new(width: 600, height: 300, title: "Gas Sensor PPM - Real Time")
+  |> VegaLite.data_from_values(trimmed_data)
+  |> VegaLite.mark(:line, point: true, tooltip: true)
+  |> VegaLite.encode_field(:x, :time, 
+    type: :temporal, 
+    title: "Time",
+    time_unit: :secondsminutes
+  )
+  |> VegaLite.encode_field(:y, :ppm, 
+    type: :quantitative, 
+    title: "PPM (Parts Per Million)",
+    scale: [domain: [0, max(100, Enum.max(Enum.map(trimmed_data, & &1.ppm)) + 10)]]
+  )
+  |> VegaLite.encode_field(:color, :status,
+    type: :nominal,
+    scale: [domain: [:ok, :error, :not_started], range: ["green", "red", "gray"]]
+  )
+  
+  # Render to frame
+  Kino.Frame.render(chart_frame, chart)
+  
+  # Return updated data for next iteration
+  trimmed_data
+end
+
+# Start with empty data and setup periodic updates
+initial_data = []
+Kino.Frame.render(chart_frame, Kino.Markdown.new("Starting data collection..."))
+
+# Update every 1 second
+Kino.Frame.periodically(chart_frame, 1000, fn frame, data ->
+  new_data = update_chart.(data)
+  {:cont, new_data}
+end, initial_data)
+
+chart_frame
+```
+
+## Current Value Display
+
+Show the current PPM value in a large, easy-to-read format:
+
+```elixir
+current_value_frame = Kino.Frame.new()
+
+update_value = fn ->
+  reading = :rpc.call(target_node, GasSensor.ReadingAgent, :get_reading, [])
+  
+  color = cond do
+    reading.ppm < 50 -> "#16a34a"  # Green
+    reading.ppm < 100 -> "#ca8a04"  # Yellow
+    true -> "#dc2626"  # Red
+  end
+  
+  content = Kino.Markdown.new("""
+  <div style="text-align: center; padding: 20px;">
+    <div style="font-size: 72px; font-weight: bold; color: #{color};">
+      #{Float.round(reading.ppm, 1)}
+    </div>
+    <div style="font-size: 24px; color: #666;">
+      PPM
+    </div>
+    <div style="font-size: 14px; color: #999; margin-top: 10px;">
+      Status: #{reading.status} | Updated: #{Time.utc_now()}
+    </div>
+  </div>
+  """)
+  
+  Kino.Frame.render(current_value_frame, content)
+end
+
+# Update every second
+Kino.Frame.periodically(current_value_frame, 1000, fn _ ->
+  update_value.()
+end)
+
+update_value.()
+current_value_frame
+```
+
+## Sliding Window Samples
+
+Display the last 7 samples in a bar chart:
+
+```elixir
+window_chart_frame = Kino.Frame.new()
+
+update_window_chart = fn ->
+  reading = :rpc.call(target_node, GasSensor.ReadingAgent, :get_reading, [])
+  
+  if length(reading.window) > 0 do
+    window_data = reading.window
+    |> Enum.with_index(1)
+    |> Enum.map(fn {ppm, idx} ->
+      %{
+        sample: "Sample #{idx}",
+        ppm: ppm,
+        level: cond do
+          ppm < 50 -> "Good"
+          ppm < 100 -> "Moderate"
+          true -> "High"
+        end
+      }
+    end)
+    
+    chart = VegaLite.new(width: 400, height: 200, title: "Last 7 Samples (5-Second Window)")
+    |> VegaLite.data_from_values(window_data)
+    |> VegaLite.mark(:bar)
+    |> VegaLite.encode_field(:x, :sample, type: :ordinal, title: "Sample")
+    |> VegaLite.encode_field(:y, :ppm, type: :quantitative, title: "PPM")
+    |> VegaLite.encode_field(:color, :level,
+      type: :nominal,
+      scale: [domain: ["Good", "Moderate", "High"], range: ["#16a34a", "#ca8a04", "#dc2626"]]
+    )
+    
+    Kino.Frame.render(window_chart_frame, chart)
+  else
+    Kino.Frame.render(window_chart_frame, Kino.Markdown.new("Collecting samples... (need 7 samples)"))
+  end
+end
+
+# Update every 2 seconds
+Kino.Frame.periodically(window_chart_frame, 2000, fn _ ->
+  update_window_chart.()
+end)
+
+update_window_chart.()
+window_chart_frame
+```
+
+## Statistics Over Time
+
+Track statistics as they evolve:
+
+```elixir
+stats_frame = Kino.Frame.new()
+
+# Keep history of stats
+update_stats = fn history ->
+  reading = :rpc.call(target_node, GasSensor.ReadingAgent, :get_reading, [])
+  
+  stats = if length(reading.window) > 0 do
+    values = reading.window
+    %{
+      time: Time.utc_now(),
+      current: reading.ppm,
+      median: Enum.sort(values) |> Enum.at(div(length(values), 2)),
+      avg: Enum.sum(values) / length(values),
+      min: Enum.min(values),
+      max: Enum.max(values)
+    }
+  else
+    %{time: Time.utc_now(), current: 0, median: 0, avg: 0, min: 0, max: 0}
+  end
+  
+  # Add to history (keep last 30 entries = 5 minutes at 10s intervals)
+  new_history = (history ++ [stats]) |> Enum.take(-30)
+  
+  # Display as table
+  latest = List.last(new_history) || stats
+  
+  table_data = [
+    %{metric: "Current", value: Float.round(latest.current, 2), unit: "ppm"},
+    %{metric: "Median", value: Float.round(latest.median, 2), unit: "ppm"},
+    %{metric: "Average", value: Float.round(latest.avg, 2), unit: "ppm"},
+    %{metric: "Minimum", value: Float.round(latest.min, 2), unit: "ppm"},
+    %{metric: "Maximum", value: Float.round(latest.max, 2), unit: "ppm"},
+    %{metric: "Range", value: Float.round(latest.max - latest.min, 2), unit: "ppm"}
+  ]
+  
+  Kino.Frame.render(stats_frame, Kino.DataTable.new(table_data))
+  
+  new_history
+end
+
+# Update every 10 seconds
+Kino.Frame.periodically(stats_frame, 10000, fn _ ->
+  update_stats.()
+end)
+
+update_stats.()
+stats_frame
+```
+
+## Threshold Alerts
+
+Display visual alerts when PPM exceeds thresholds:
+
+```elixir
+alerts_frame = Kino.Frame.new()
+
+update_alerts = fn ->
+  reading = :rpc.call(target_node, GasSensor.ReadingAgent, :get_reading, [])
+  ppm = reading.ppm
+  
+  alert_html = cond do
+    ppm >= 200 -> """
+      <div style="background: #dc2626; color: white; padding: 20px; border-radius: 10px; text-align: center;">
+        <div style="font-size: 32px; font-weight: bold;">⚠️ DANGER</div>
+        <div style="font-size: 18px;">CO Level Critical: #{Float.round(ppm, 1)} PPM</div>
+        <div style="font-size: 14px; margin-top: 10px;">Evacuate area immediately!</div>
+      </div>
+    """
+    
+    ppm >= 100 -> """
+      <div style="background: #ea580c; color: white; padding: 20px; border-radius: 10px; text-align: center;">
+        <div style="font-size: 32px; font-weight: bold;">⚠️ WARNING</div>
+        <div style="font-size: 18px;">CO Level High: #{Float.round(ppm, 1)} PPM</div>
+        <div style="font-size: 14px; margin-top: 10px;">Ventilate area immediately</div>
+      </div>
+    """
+    
+    ppm >= 50 -> """
+      <div style="background: #ca8a04; color: white; padding: 20px; border-radius: 10px; text-align: center;">
+        <div style="font-size: 32px; font-weight: bold;">⚡ CAUTION</div>
+        <div style="font-size: 18px;">CO Level Moderate: #{Float.round(ppm, 1)} PPM</div>
+        <div style="font-size: 14px; margin-top: 10px;">Monitor closely</div>
+      </div>
+    """
+    
+    true -> """
+      <div style="background: #16a34a; color: white; padding: 20px; border-radius: 10px; text-align: center;">
+        <div style="font-size: 32px; font-weight: bold;">✓ NORMAL</div>
+        <div style="font-size: 18px;">CO Level Safe: #{Float.round(ppm, 1)} PPM</div>
+        <div style="font-size: 14px; margin-top: 10px;">No action required</div>
+      </div>
+    """
+  end
+  
+  Kino.Frame.render(alerts_frame, Kino.HTML.new(alert_html))
+end
+
+# Update every 2 seconds
+Kino.Frame.periodically(alerts_frame, 2000, fn _ ->
+  update_alerts.()
+end)
+
+update_alerts.()
+alerts_frame
+```
+
+## Usage Tips
+
+1. **Keep this notebook running** to continuously monitor your sensor
+2. **The graph auto-scrolls** - showing the last 60 seconds
+3. **Color coding:**
+   - Green dots = Sensor status :ok
+   - Red dots = Sensor status :error
+4. **Resize charts** by modifying the `width` and `height` parameters
+5. **Export data** by copying the data buffer contents
+
+## Troubleshooting
+
+**If charts don't update:**
+1. Check connection: `Node.list()` should show the Pi node
+2. Verify sensor is running: `:rpc.call(target_node, Process, :whereis, [GasSensor.Sensor])`
+3. Try increasing the update interval if RPC calls are slow
+
+**If VegaLite charts fail:**
+- Ensure you have an internet connection (loads JS libraries)
+- Try refreshing the page
+- Check browser console for JavaScript errors

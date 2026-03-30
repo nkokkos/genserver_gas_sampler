@@ -1,0 +1,234 @@
+# Gas Sensor Monitor - Basic Dashboard
+
+## Introduction
+
+This Livebook connects to your Raspberry Pi Zero W running the gas sensor firmware and displays real-time sensor data in a simple dashboard format.
+
+## Requirements
+
+- Your Pi Zero W must be on the same network as this computer
+- You need to know the Pi's IP address
+- The preset cookie is: `gassensor_demo_cookie_2024`
+
+## Setup
+
+Configure the connection to your Pi Zero:
+
+```elixir
+# Set these variables to match your setup
+pi_ip = "192.168.1.45"  # Change to your Pi's IP address
+cookie = "gassensor_demo_cookie_2024"
+local_ip = "192.168.1.100"  # Change to your laptop's IP
+
+# Start the distributed node
+Node.start(:"livebook@#{local_ip}", :shortnames)
+Node.set_cookie(String.to_atom(cookie))
+
+# Connect to the Pi
+target_node = :"sampler@#{pi_ip}"
+connection_result = Node.connect(target_node)
+
+# Verify connection
+if connection_result do
+  Kino.Markdown.new("""
+  ### ✅ Connected successfully!
+  
+  **Target Node:** `#{target_node}`
+  **Local Node:** `#{Node.self()}`
+  """)
+else
+  Kino.Markdown.new("""
+  ### ❌ Connection failed
+  
+  Please check:
+  1. Pi is powered on and booted
+  2. Both devices are on the same network
+  3. IP addresses are correct
+  4. Firewall allows port 4369
+  """)
+end
+```
+
+## Current Sensor Reading
+
+Display the current sensor status:
+
+```elixir
+# Fetch current reading from Pi
+reading = :rpc.call(target_node, GasSensor.ReadingAgent, :get_reading, [])
+
+# Display as formatted table
+Kino.DataTable.new([
+  %{metric: "Current PPM", value: "#{Float.round(reading.ppm, 2)} ppm", status: "✓"},
+  %{metric: "Sensor Status", value: "#{reading.status}", status: (if reading.status == :ok, do: "✓", else: "⚠")},
+  %{metric: "Sample Count", value: reading.sample_count, status: "✓"},
+  %{metric: "Window Size", value: "#{length(reading.window)} samples", status: "✓"},
+  %{metric: "Last Update", value: "#{reading.timestamp}", status: "✓"}
+])
+```
+
+## Raw Sensor Data
+
+View the detailed reading structure:
+
+```elixir
+# Display full data structure
+Kino.Tree.new(reading)
+```
+
+## Recent Samples
+
+Display the last 7 samples from the sliding window:
+
+```elixir
+# Create table of recent samples
+samples_table = 
+  reading.window
+  |> Enum.with_index(1)
+  |> Enum.map(fn {ppm, idx} ->
+    %{
+      "Sample #" => idx,
+      "PPM Value" => Float.round(ppm, 2),
+      "Status" => cond do
+        ppm < 50 -> "✓ Good"
+        ppm < 100 -> "⚠ Moderate"
+        true -> "✗ High"
+      end
+    }
+  end)
+
+Kino.DataTable.new(samples_table)
+```
+
+## Quick Stats
+
+Calculate and display statistics:
+
+```elixir
+# Calculate statistics
+stats = if length(reading.window) > 0 do
+  values = reading.window
+  median = Enum.sort(values) |> Enum.at(div(length(values), 2))
+  avg = Enum.sum(values) / length(values)
+  min = Enum.min(values)
+  max = Enum.max(values)
+  
+  [
+    %{statistic: "Current", value: Float.round(reading.ppm, 2), unit: "ppm"},
+    %{statistic: "Median", value: Float.round(median, 2), unit: "ppm"},
+    %{statistic: "Average", value: Float.round(avg, 2), unit: "ppm"},
+    %{statistic: "Minimum", value: Float.round(min, 2), unit: "ppm"},
+    %{statistic: "Maximum", value: Float.round(max, 2), unit: "ppm"},
+    %{statistic: "Range", value: Float.round(max - min, 2), unit: "ppm"}
+  ]
+else
+  [%{statistic: "Status", value: "No samples yet", unit: ""}]
+end
+
+Kino.DataTable.new(stats)
+```
+
+## Auto-Refresh Setup
+
+To automatically update this dashboard every 5 seconds:
+
+```elixir
+# Create a frame for auto-refreshing content
+frame = Kino.Frame.new()
+
+# Function to update frame
+update_dashboard = fn ->
+  r = :rpc.call(target_node, GasSensor.ReadingAgent, :get_reading, [])
+  
+  content = Kino.Markdown.new("""
+  ## Live Sensor Data
+  
+  **PPM:** #{Float.round(r.ppm, 2)}  
+  **Status:** #{r.status}  
+  **Samples:** #{r.sample_count}  
+  **Updated:** #{Time.utc_now()}
+  """)
+  
+  Kino.Frame.render(frame, content)
+end
+
+# Initial render
+update_dashboard.()
+
+# Setup periodic updates (every 5 seconds)
+Kino.Frame.periodically(frame, 5000, fn _ ->
+  update_dashboard.()
+end)
+
+frame
+```
+
+## System Information
+
+Check the Pi's system status:
+
+```elixir
+# Get memory usage
+memory = :rpc.call(target_node, :erlang, :memory, [])
+
+memory_stats = [
+  %{type: "Total", bytes: memory[:total], mb: Float.round(memory[:total] / 1024 / 1024, 2)},
+  %{type: "Processes", bytes: memory[:processes], mb: Float.round(memory[:processes] / 1024 / 1024, 2)},
+  %{type: "System", bytes: memory[:system], mb: Float.round(memory[:system] / 1024 / 1024, 2)},
+  %{type: "ETS", bytes: memory[:ets], mb: Float.round(memory[:ets] / 1024 / 1024, 2)},
+  %{type: "Atom", bytes: memory[:atom], mb: Float.round(memory[:atom] / 1024 / 1024, 2)}
+]
+
+Kino.DataTable.new(memory_stats)
+```
+
+## Process Count
+
+Monitor the number of running processes:
+
+```elixir
+# Get process count
+process_count = :rpc.call(target_node, :erlang, :system_info, [:process_count])
+max_processes = :rpc.call(target_node, :erlang, :system_info, [:process_limit])
+
+Kino.Markdown.new("""
+### Process Status
+
+**Current Processes:** #{process_count}  
+**Maximum Allowed:** #{max_processes}  
+**Usage:** #{Float.round(process_count / max_processes * 100, 2)}%
+""")
+```
+
+## Connection Test
+
+Verify the connection is working:
+
+```elixir
+# Test RPC calls
+tests = [
+  %{test: "Node Connected", result: Node.list() |> Enum.member?(target_node), expected: true},
+  %{test: "ReadingAgent Running", result: :rpc.call(target_node, Process, :whereis, [GasSensor.ReadingAgent]) != nil, expected: true},
+  %{test: "Sensor Running", result: :rpc.call(target_node, Process, :whereis, [GasSensor.Sensor]) != nil, expected: true},
+  %{test: "Web Endpoint Running", result: :rpc.call(target_node, Process, :whereis, [GasSensorWeb.Endpoint]) != nil, expected: true},
+  %{test: "Can Read PPM", result: is_number(:rpc.call(target_node, GasSensor.ReadingAgent, :get_ppm, [])), expected: true}
+]
+
+Kino.DataTable.new(tests)
+```
+
+## Troubleshooting
+
+If you're having issues:
+
+1. **Check Pi is booted:** Ping the IP address from your terminal
+2. **Verify EPMD:** On the Pi, run `:os.cmd('epmd -names')` in IEx
+3. **Check cookie:** Ensure both sides use `gassensor_demo_cookie_2024`
+4. **Firewall:** Ensure port 4369 (EPMD) is open on your network
+5. **Network:** Both devices must be on the same subnet
+
+## Next Steps
+
+- Try the **Real-Time Graph** notebook for live charting
+- Use **Historical Analysis** to track trends over time
+- Check **System Health** for detailed VM monitoring

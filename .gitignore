@@ -1,0 +1,27 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Log files
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Elixir build artifacts
+_build/
+
+# Mix artifacts
+/cover/
+/.fetch
+erl_crash.dump
+*.ez

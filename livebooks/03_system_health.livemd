@@ -1,0 +1,388 @@
+# Gas Sensor Monitor - System Health Dashboard
+
+## Introduction
+
+This Livebook provides detailed monitoring of the Raspberry Pi Zero W system health, including memory usage, process counts, and VM statistics. Useful for debugging performance issues and ensuring long-term stability.
+
+## Setup
+
+Configure connection to your Pi:
+
+```elixir
+# Configuration
+pi_ip = "192.168.1.45"  # Change to your Pi's IP
+cookie = "gassensor_demo_cookie_2024"
+local_ip = "192.168.1.100"  # Change to your laptop's IP
+
+# Start distributed node
+Node.start(:"livebook@#{local_ip}", :shortnames)
+Node.set_cookie(String.to_atom(cookie))
+
+# Connect to Pi
+target_node = :"sampler@#{pi_ip}"
+Node.connect(target_node)
+
+# Verify
+if target_node in Node.list() do
+  Kino.Markdown.new("""### ✅ Connected to #{target_node}""")
+else
+  Kino.Markdown.new("""### ❌ Connection failed""")
+end
+```
+
+## Memory Overview
+
+Display current memory usage breakdown:
+
+```elixir
+# Get detailed memory info
+memory = :rpc.call(target_node, :erlang, :memory, [])
+
+# Format for display
+memory_data = [
+  %{category: "Total", bytes: memory[:total], mb: Float.round(memory[:total] / 1024 / 1024, 2), percentage: 100.0},
+  %{category: "Processes", bytes: memory[:processes], mb: Float.round(memory[:processes] / 1024 / 1024, 2), percentage: Float.round(memory[:processes] / memory[:total] * 100, 1)},
+  %{category: "System", bytes: memory[:system], mb: Float.round(memory[:system] / 1024 / 1024, 2), percentage: Float.round(memory[:system] / memory[:total] * 100, 1)},
+  %{category: "Atom", bytes: memory[:atom], mb: Float.round(memory[:atom] / 1024 / 1024, 2), percentage: Float.round(memory[:atom] / memory[:total] * 100, 1)},
+  %{category: "Binary", bytes: memory[:binary], mb: Float.round(memory[:binary] / 1024 / 1024, 2), percentage: Float.round(memory[:binary] / memory[:total] * 100, 1)},
+  %{category: "Code", bytes: memory[:code], mb: Float.round(memory[:code] / 1024 / 1024, 2), percentage: Float.round(memory[:code] / memory[:total] * 100, 1)},
+  %{category: "ETS", bytes: memory[:ets], mb: Float.round(memory[:ets] / 1024 / 1024, 2), percentage: Float.round(memory[:ets] / memory[:total] * 100, 1)}
+]
+
+Kino.DataTable.new(memory_data)
+```
+
+## Memory Pie Chart
+
+Visual representation of memory distribution:
+
+```elixir
+# Create pie chart
+pie_data = memory_data |> Enum.reject(&(&1.category == "Total"))
+
+VegaLite.new(width: 400, height: 400, title: "Memory Distribution (MB)")
+|> VegaLite.data_from_values(pie_data)
+|> VegaLite.mark(:arc, inner_radius: 50)
+|> VegaLite.encode_field(:theta, :mb, type: :quantitative)
+|> VegaLite.encode_field(:color, :category, type: :nominal)
+|> VegaLite.encode_field(:tooltip, :category)
+```
+
+## Memory History Tracking
+
+Track memory usage over time:
+
+```elixir
+memory_frame = Kino.Frame.new()
+
+# History buffer
+update_memory_chart = fn history ->
+  mem = :rpc.call(target_node, :erlang, :memory, [])
+  
+  entry = %{
+    time: Time.utc_now(),
+    total_mb: Float.round(mem[:total] / 1024 / 1024, 2),
+    processes_mb: Float.round(mem[:processes] / 1024 / 1024, 2),
+    system_mb: Float.round(mem[:system] / 1024 / 1024, 2)
+  }
+  
+  # Keep last 30 entries (5 minutes at 10s intervals)
+  new_history = (history ++ [entry]) |> Enum.take(-30)
+  
+  # Create line chart
+  chart = VegaLite.new(width: 600, height: 300, title: "Memory Usage Over Time")
+  |> VegaLite.data_from_values(new_history)
+  |> VegaLite.transform(fold: [["total_mb", "processes_mb", "system_mb"], as: ["memory_type", "mb"]])
+  |> VegaLite.mark(:line)
+  |> VegaLite.encode_field(:x, :time, type: :temporal)
+  |> VegaLite.encode_field(:y, :mb, type: :quantitative, title: "Memory (MB)")
+  |> VegaLite.encode_field(:color, :memory_type, type: :nominal)
+  
+  Kino.Frame.render(memory_frame, chart)
+  new_history
+end
+
+# Update every 10 seconds
+Kino.Frame.periodically(memory_frame, 10000, fn _ ->
+  update_memory_chart.([])
+end)
+
+update_memory_chart.([])
+memory_frame
+```
+
+## Process Information
+
+Display process statistics:
+
+```elixir
+# Get process info
+process_count = :rpc.call(target_node, :erlang, :system_info, [:process_count])
+process_limit = :rpc.call(target_node, :erlang, :system_info, [:process_limit])
+run_queue = :rpc.call(target_node, :erlang, :statistics, [:run_queue])
+
+process_data = [
+  %{metric: "Active Processes", value: process_count, limit: process_limit, percentage: Float.round(process_count / process_limit * 100, 2)},
+  %{metric: "Process Limit", value: process_limit, limit: "∞", percentage: "-"},
+  %{metric: "Run Queue", value: run_queue, limit: "N/A", percentage: "-"}
+]
+
+Kino.DataTable.new(process_data)
+```
+
+## Top Processes by Memory
+
+Find the processes using the most memory:
+
+```elixir
+# Get top 10 processes by memory
+top_processes = :rpc.call(target_node, :recon, :proc_count, [:memory, 10])
+
+processes_data = Enum.map(top_processes, fn {pid, mem_val, [name: name]} ->
+  %{
+    pid: inspect(pid),
+    name: (if name == :undefined, do: "anonymous", else: inspect(name)),
+    memory_kb: Float.round(mem_val / 1024, 2),
+    memory_mb: Float.round(mem_val / 1024 / 1024, 3)
+  }
+end)
+
+Kino.DataTable.new(processes_data)
+```
+
+## Application Status
+
+Check which OTP applications are running:
+
+```elixir
+# Get all loaded applications
+apps = :rpc.call(target_node, Application, :started_applications, [])
+
+app_data = Enum.map(apps, fn {name, _desc, version} ->
+  %{
+    application: name,
+    version: to_string(version),
+    status: "✓ Running"
+  }
+end)
+
+Kino.DataTable.new(app_data)
+```
+
+## Scheduler Information
+
+Monitor scheduler utilization:
+
+```elixir
+# Get scheduler info
+schedulers = :rpc.call(target_node, :erlang, :system_info, [:schedulers])
+scheduler_online = :rpc.call(target_node, :erlang, :system_info, [:schedulers_online])
+
+# Get stats
+stats = :rpc.call(target_node, :erlang, :statistics, [:scheduler_wall_time])
+
+scheduler_data = [
+  %{property: "Total Schedulers", value: schedulers},
+  %{property: "Online Schedulers", value: scheduler_online},
+  %{property: "Statistics Available", value: if(stats != :undefined, do: "Yes", else: "No")}
+]
+
+Kino.DataTable.new(scheduler_data)
+```
+
+## System Limits
+
+Display various system limits:
+
+```elixir
+# Get system limits
+atom_limit = :rpc.call(target_node, :erlang, :system_info, [:atom_limit])
+port_limit = :rpc.call(target_node, :erlang, :system_info, [:port_limit])
+ets_limit = :rpc.call(target_node, :erlang, :system_info, [:ets_limit])
+
+limits_data = [
+  %{resource: "Atom Table", current: :rpc.call(target_node, :erlang, :system_info, [:atom_count]), limit: atom_limit, percentage: Float.round(:rpc.call(target_node, :erlang, :system_info, [:atom_count]) / atom_limit * 100, 2)},
+  %{resource: "Ports", current: length(:rpc.call(target_node, :erlang, :ports, [])), limit: port_limit, percentage: Float.round(length(:rpc.call(target_node, :erlang, :ports, [])) / port_limit * 100, 2)},
+  %{resource: "ETS Tables", current: length(:rpc.call(target_node, :ets, :all, [])), limit: ets_limit, percentage: Float.round(length(:rpc.call(target_node, :ets, :all, [])) / ets_limit * 100, 2)}
+]
+
+Kino.DataTable.new(limits_data)
+```
+
+## Garbage Collection Stats
+
+Monitor garbage collection activity:
+
+```elixir
+# Get GC statistics
+gc_stats = :rpc.call(target_node, :erlang, :statistics, [:garbage_collection])
+
+gc_data = case gc_stats do
+  {collections, words_reclaimed, _} ->
+    [
+      %{stat: "Total Collections", value: collections},
+      %{stat: "Words Reclaimed", value: words_reclaimed, formatted: "#{Float.round(words_reclaimed * 8 / 1024 / 1024, 2)} MB"}
+    ]
+  _ ->
+    [%{stat: "Status", value: "GC stats not available"}]
+end
+
+Kino.DataTable.new(gc_data)
+```
+
+## Error Logger Status
+
+Check the ring logger (error history):
+
+```elixir
+# Try to get ring logger info
+logger_info = try do
+  :rpc.call(target_node, RingLogger, :count, [])
+catch
+  _, _ -> "Unable to fetch"
+end
+
+logger_data = [
+  %{component: "Logger Backend", status: "RingLogger"},
+  %{component: "Log Entries", status: logger_info},
+  %{component: "Log Level", status: :rpc.call(target_node, Application, :get_env, [:logger, :level, :warning])}
+]
+
+Kino.DataTable.new(logger_data)
+```
+
+## Real-Time System Monitor
+
+Auto-updating dashboard showing key metrics:
+
+```elixir
+dashboard_frame = Kino.Frame.new()
+
+update_dashboard = fn ->
+  mem = :rpc.call(target_node, :erlang, :memory, [])
+  procs = :rpc.call(target_node, :erlang, :system_info, [:process_count])
+  reading = :rpc.call(target_node, GasSensor.ReadingAgent, :get_reading, [])
+  
+  total_mb = Float.round(mem[:total] / 1024 / 1024, 1)
+  
+  status_color = cond do
+    total_mb > 180 -> "#dc2626"  # Red - high memory
+    total_mb > 150 -> "#ca8a04"  # Yellow - moderate
+    true -> "#16a34a"  # Green - good
+  end
+  
+  html = """
+  <div style="font-family: system-ui; padding: 20px; border: 2px solid #{status_color}; border-radius: 10px;">
+    <h2 style="margin-top: 0; color: #{status_color};">System Health Dashboard</h2>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+      <div style="background: #f3f4f6; padding: 15px; border-radius: 8px;">
+        <h3 style="margin-top: 0;">Memory</h3>
+        <div style="font-size: 32px; font-weight: bold; color: #{status_color};">#{total_mb} MB</div>
+        <div style="font-size: 12px; color: #666;">Processes: #{Float.round(mem[:processes] / 1024 / 1024, 1)} MB</div>
+        <div style="font-size: 12px; color: #666;">System: #{Float.round(mem[:system] / 1024 / 1024, 1)} MB</div>
+      </div>
+      
+      <div style="background: #f3f4f6; padding: 15px; border-radius: 8px;">
+        <h3 style="margin-top: 0;">Processes</h3>
+        <div style="font-size: 32px; font-weight: bold;">#{procs}</div>
+        <div style="font-size: 12px; color: #666;">Active processes</div>
+      </div>
+      
+      <div style="background: #f3f4f6; padding: 15px; border-radius: 8px;">
+        <h3 style="margin-top: 0;">Sensor Status</h3>
+        <div style="font-size: 24px; font-weight: bold; color: #{if reading.status == :ok, do: "#16a34a", else: "#dc2626"};">#{reading.status}</div>
+        <div style="font-size: 12px; color: #666;">#{reading.sample_count} samples taken</div>
+      </div>
+      
+      <div style="background: #f3f4f6; padding: 15px; border-radius: 8px;">
+        <h3 style="margin-top: 0;">Current PPM</h3>
+        <div style="font-size: 32px; font-weight: bold;">#{Float.round(reading.ppm, 1)}</div>
+        <div style="font-size: 12px; color: #666;">Parts per million</div>
+      </div>
+    </div>
+    
+    <div style="margin-top: 15px; font-size: 12px; color: #999; text-align: right;">
+      Last updated: #{Time.utc_now()}
+    </div>
+  </div>
+  """
+  
+  Kino.Frame.render(dashboard_frame, Kino.HTML.new(html))
+end
+
+# Update every 5 seconds
+Kino.Frame.periodically(dashboard_frame, 5000, fn _ ->
+  update_dashboard.()
+end)
+
+update_dashboard.()
+dashboard_frame
+```
+
+## IO & Network Statistics
+
+Check network and I/O activity:
+
+```elixir
+# Get IO statistics (if available)
+io_stats = :rpc.call(target_node, :erlang, :statistics, [:io])
+
+io_data = case io_stats do
+  {{:input, input_bytes}, {:output, output_bytes}} ->
+    [
+      %{direction: "Input", bytes: input_bytes, mb: Float.round(input_bytes / 1024 / 1024, 2)},
+      %{direction: "Output", bytes: output_bytes, mb: Float.round(output_bytes / 1024 / 1024, 2)}
+    ]
+  _ ->
+    [%{direction: "Status", bytes: "N/A", mb: "Stats unavailable"}]
+end
+
+Kino.DataTable.new(io_data)
+```
+
+## Troubleshooting Guide
+
+### High Memory Usage
+
+If memory exceeds 200MB:
+1. Check for memory leaks in specific processes
+2. Look at binary heap usage
+3. Consider reducing max_connections in web config
+4. Check if sensor window is growing unbounded
+
+### Too Many Processes
+
+If process count > 500:
+1. Check web connection count
+2. Look for orphaned processes
+3. Verify timer cleanup
+4. Check for process leaks in custom code
+
+### Scheduler Saturation
+
+If run_queue > 10 consistently:
+1. System is overloaded
+2. Consider reducing sampling frequency
+3. Check if I2C operations are blocking
+4. May need to optimize code
+
+## Best Practices
+
+**For long-running monitoring:**
+1. Keep this notebook open in a background tab
+2. Check memory graph trends weekly
+3. Set up alerts if memory > 200MB
+4. Monitor process count stability
+
+**Performance optimization:**
+1. Keep total processes < 300
+2. Memory should stabilize after 1 hour
+3. GC collections should be frequent but short
+4. Run queue should usually be 0
+
+**When to restart:**
+- Memory growing continuously over days
+- Process count increasing without bound
+- Scheduler run_queue consistently > 20
+- ETS tables growing unexpectedly

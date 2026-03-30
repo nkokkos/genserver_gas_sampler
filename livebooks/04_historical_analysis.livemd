@@ -1,0 +1,512 @@
+# Gas Sensor Monitor - Historical Analysis
+
+## Introduction
+
+This Livebook provides tools for analyzing gas sensor data over longer time periods. Useful for identifying patterns, trends, and anomalies in sensor readings.
+
+## Setup
+
+Configure connection to your Pi:
+
+```elixir
+# Configuration
+pi_ip = "192.168.1.45"  # Change to your Pi's IP
+cookie = "gassensor_demo_cookie_2024"
+local_ip = "192.168.1.100"  # Change to your laptop's IP
+
+# Start distributed node
+Node.start(:"livebook@#{local_ip}", :shortnames)
+Node.set_cookie(String.to_atom(cookie))
+
+# Connect to Pi
+target_node = :"sampler@#{pi_ip}"
+connection = Node.connect(target_node)
+
+if connection do
+  Kino.Markdown.new("""
+  ### ✅ Connected successfully
+  
+  **Target:** #{target_node}  
+  **Local:** #{Node.self()}  
+  **Cookie:** #{cookie}
+  """)
+else
+  Kino.Markdown.new("""
+  ### ❌ Connection failed
+  
+  Please check:
+  1. Pi is powered on and booted
+  2. Network connectivity
+  3. IP addresses are correct
+  """)
+end
+```
+
+## Data Collection
+
+Set up a data collector to sample readings over time:
+
+```elixir
+# Create a data collection frame
+collection_frame = Kino.Frame.new()
+
+# Data collector state
+collect_data = fn duration_seconds, interval_seconds, existing_data ->
+  start_time = Time.utc_now()
+  end_time = Time.add(start_time, duration_seconds)
+  
+  Kino.Frame.render(collection_frame, Kino.Markdown.new("""
+  ### 📊 Collecting Data
+  
+  **Started:** #{start_time}  
+  **Will end:** #{end_time}  
+  **Sample rate:** Every #{interval_seconds}s  
+  **Expected samples:** #{div(duration_seconds, interval_seconds)}
+  
+  Current samples: #{length(existing_data)}
+  """))
+  
+  # Collect samples
+  new_data = 
+    Stream.interval(interval_seconds * 1000)
+    |> Stream.take(div(duration_seconds, interval_seconds))
+    |> Enum.map(fn _ ->
+      reading = :rpc.call(target_node, GasSensor.ReadingAgent, :get_reading, [])
+      %{
+        timestamp: DateTime.utc_now(),
+        ppm: reading.ppm,
+        status: reading.status,
+        sample_count: reading.sample_count
+      }
+    end)
+  
+  all_data = existing_data ++ new_data
+  
+  Kino.Frame.render(collection_frame, Kino.Markdown.new("""
+  ### ✅ Collection Complete
+  
+  **Total samples:** #{length(all_data)}  
+  **Duration:** #{duration_seconds} seconds  
+  **Data ready for analysis**
+  """))
+  
+  all_data
+end
+
+# Example: Collect 5 minutes of data, sampling every 5 seconds
+# collected_data = collect_data.(300, 5, [])
+
+Kino.Frame.render(collection_frame, Kino.Markdown.new("""
+### Ready to Collect
+
+Use the code above to start collecting data.  
+**Example:** `collect_data.(300, 5, [])` collects 5 minutes at 5-second intervals.
+"""))
+
+collection_frame
+```
+
+## Statistical Analysis
+
+Analyze collected data for patterns:
+
+```elixir
+# Example data structure (replace with your collected_data)
+example_data = [
+  %{timestamp: ~U[2024-03-30 10:00:00Z], ppm: 45.2, status: :ok},
+  %{timestamp: ~U[2024-03-30 10:00:05Z], ppm: 46.1, status: :ok},
+  %{timestamp: ~U[2024-03-30 10:00:10Z], ppm: 45.8, status: :ok},
+  %{timestamp: ~U[2024-03-30 10:00:15Z], ppm: 47.3, status: :ok},
+  %{timestamp: ~U[2024-03-30 10:00:20Z], ppm: 44.9, status: :ok}
+]
+
+# Use this to analyze your actual data
+analyze_data = fn dataset ->
+  ppms = Enum.map(dataset, & &1.ppm)
+  n = length(ppms)
+  
+  if n > 0 do
+    mean = Enum.sum(ppms) / n
+    variance = Enum.map(ppms, &(&1 - mean) * (&1 - mean)) |> Enum.sum() / n
+    std_dev = :math.sqrt(variance)
+    
+    sorted = Enum.sort(ppms)
+    median = Enum.at(sorted, div(n, 2))
+    min = hd(sorted)
+    max = List.last(sorted)
+    range = max - min
+    
+    %{
+      count: n,
+      mean: Float.round(mean, 2),
+      median: Float.round(median, 2),
+      min: Float.round(min, 2),
+      max: Float.round(max, 2),
+      range: Float.round(range, 2),
+      std_dev: Float.round(std_dev, 2),
+      variance: Float.round(variance, 2)
+    }
+  else
+    %{error: "No data"}
+  end
+end
+
+# Example usage with sample data
+stats = analyze_data.(example_data)
+
+Kino.DataTable.new([
+  %{metric: "Sample Count", value: stats.count},
+  %{metric: "Mean", value: stats.mean, unit: "ppm"},
+  %{metric: "Median", value: stats.median, unit: "ppm"},
+  %{metric: "Std Dev", value: stats.std_dev, unit: "ppm"},
+  %{metric: "Minimum", value: stats.min, unit: "ppm"},
+  %{metric: "Maximum", value: stats.max, unit: "ppm"},
+  %{metric: "Range", value: stats.range, unit: "ppm"},
+  %{metric: "Variance", value: stats.variance}
+])
+```
+
+## Time Series Visualization
+
+Create time series charts from collected data:
+
+```elixir
+timeseries_frame = Kino.Frame.new()
+
+# Example: Create chart from your data
+create_timeseries_chart = fn dataset ->
+  if length(dataset) > 0 do
+    chart = VegaLite.new(width: 700, height: 350, title: "PPM Over Time")
+    |> VegaLite.data_from_values(dataset)
+    |> VegaLite.mark(:line, point: true)
+    |> VegaLite.encode_field(:x, :timestamp, type: :temporal, title: "Time")
+    |> VegaLite.encode_field(:y, :ppm, type: :quantitative, title: "PPM")
+    |> VegaLite.encode_field(:color, :status, type: :nominal)
+    
+    Kino.Frame.render(timeseries_frame, chart)
+  else
+    Kino.Frame.render(timeseries_frame, Kino.Markdown.new("No data to display"))
+  end
+end
+
+# Use with your collected data
+# create_timeseries_chart.(collected_data)
+
+# Example with sample data
+create_timeseries_chart.(example_data)
+
+timeseries_frame
+```
+
+## Hourly/Daily Aggregations
+
+Group data by time periods for trend analysis:
+
+```elixir
+# Function to group by hour
+group_by_hour = fn dataset ->
+  dataset
+  |> Enum.group_by(fn d -> 
+    d.timestamp.hour
+  end)
+  |> Enum.map(fn {hour, readings} ->
+    ppms = Enum.map(readings, & &1.ppm)
+    %{
+      hour: hour,
+      count: length(ppms),
+      avg_ppm: Float.round(Enum.sum(ppms) / length(ppms), 2),
+      min_ppm: Enum.min(ppms),
+      max_ppm: Enum.max(ppms)
+    }
+  end)
+  |> Enum.sort_by(& &1.hour)
+end
+
+# Example aggregation
+hourly_stats = group_by_hour.(example_data)
+
+Kino.DataTable.new(hourly_stats)
+```
+
+## Threshold Analysis
+
+Analyze time spent above/below thresholds:
+
+```elixir
+threshold_analysis = fn dataset, thresholds ->
+  total = length(dataset)
+  
+  if total > 0 do
+    results = Enum.map(thresholds, fn {name, min, max} ->
+      count = Enum.count(dataset, fn d -> d.ppm >= min and d.ppm < max end)
+      percentage = Float.round(count / total * 100, 1)
+      avg_ppm = 
+        dataset
+        |> Enum.filter(fn d -> d.ppm >= min and d.ppm < max end)
+        |> Enum.map(& &1.ppm)
+        |> then(fn ppms -> if length(ppms) > 0, do: Enum.sum(ppms) / length(ppms), else: 0 end)
+      
+      %{
+        range: name,
+        ppm_range: "#{min}-#{max}",
+        samples: count,
+        percentage: percentage,
+        avg_ppm: Float.round(avg_ppm, 2)
+      }
+    end)
+    
+    Kino.DataTable.new(results)
+  else
+    Kino.Markdown.new("No data available")
+  end
+end
+
+# Analyze with standard thresholds
+thresholds = [
+  {"Safe", 0, 50},
+  {"Moderate", 50, 100},
+  {"High", 100, 200},
+  {"Dangerous", 200, 10000}
+]
+
+threshold_analysis.(example_data, thresholds)
+```
+
+## Trend Detection
+
+Identify increasing or decreasing trends:
+
+```elixir
+detect_trend = fn dataset, window_size ->
+  n = length(dataset)
+  
+  if n >= window_size * 2 do
+    # Split data into windows
+    mid = div(n, 2)
+    first_half = Enum.take(dataset, mid)
+    second_half = Enum.drop(dataset, mid)
+    
+    first_avg = Enum.map(first_half, & &1.ppm) |> then(fn ppms -> Enum.sum(ppms) / length(ppms) end)
+    second_avg = Enum.map(second_half, & &1.ppm) |> then(fn ppms -> Enum.sum(ppms) / length(ppms) end)
+    
+    change = second_avg - first_avg
+    percent_change = Float.round(change / first_avg * 100, 2)
+    
+    trend = cond do
+      percent_change > 10 -> "📈 Increasing significantly"
+      percent_change > 5 -> "📈 Increasing moderately"
+      percent_change < -10 -> "📉 Decreasing significantly"
+      percent_change < -5 -> "📉 Decreasing moderately"
+      true -> "➡️ Stable"
+    end
+    
+    Kino.Markdown.new("""
+    ### Trend Analysis
+    
+    **First half average:** #{Float.round(first_avg, 2)} ppm  
+    **Second half average:** #{Float.round(second_avg, 2)} ppm  
+    **Change:** #{Float.round(change, 2)} ppm (#{percent_change}%)  
+    **Trend:** #{trend}
+    """)
+  else
+    Kino.Markdown.new("Need at least #{window_size * 2} data points for trend analysis (have #{n})")
+  end
+end
+
+# Example
+detect_trend.(example_data, 10)
+```
+
+## Export to CSV
+
+Save data for external analysis:
+
+```elixir
+# Function to export data to CSV
+export_to_csv = fn dataset, filename ->
+  csv_content = 
+    ["Timestamp,PPM,Status,SampleCount"] ++
+    Enum.map(dataset, fn d ->
+      "#{d.timestamp},#{d.ppm},#{d.status},#{Map.get(d, :sample_count, "N/A")}"
+    end)
+    |> Enum.join("\n")
+  
+  File.write!(filename, csv_content)
+  Kino.Markdown.new("✅ Exported #{length(dataset)} records to `#{filename}`")
+end
+
+# Example: Export your data
+# export_to_csv.(collected_data, "/home/user/sensor_data.csv")
+
+# Show format
+sample_csv = """
+Timestamp,PPM,Status,SampleCount
+2024-03-30 10:00:00,45.2,ok,150
+2024-03-30 10:00:05,46.1,ok,151
+2024-03-30 10:00:10,45.8,ok,152
+"""
+
+Kino.Markdown.new("""
+### CSV Format
+
+```csv
+#{sample_csv}
+```
+
+Use the `export_to_csv` function with your collected data.
+""")
+```
+
+## Anomaly Detection
+
+Identify unusual readings:
+
+```elixir
+find_anomalies = fn dataset, threshold_std_dev ->
+  ppms = Enum.map(dataset, & &1.ppm)
+  n = length(ppms)
+  
+  if n > 0 do
+    mean = Enum.sum(ppms) / n
+    variance = Enum.map(ppms, &(&1 - mean) * (&1 - mean)) |> Enum.sum() / n
+    std_dev = :math.sqrt(variance)
+    
+    # Find anomalies (readings outside threshold_std_dev standard deviations)
+    threshold = threshold_std_dev * std_dev
+    
+    anomalies = Enum.filter(dataset, fn d ->
+      abs(d.ppm - mean) > threshold
+    end)
+    
+    if length(anomalies) > 0 do
+      anomaly_data = Enum.map(anomalies, fn a ->
+        %{
+          timestamp: a.timestamp,
+          ppm: a.ppm,
+          deviation: Float.round(abs(a.ppm - mean), 2),
+          direction: if(a.ppm > mean, do: "High", else: "Low")
+        }
+      end)
+      
+      Kino.DataTable.new(anomaly_data)
+    else
+      Kino.Markdown.new("✅ No anomalies detected (threshold: #{threshold_std_dev}σ, mean: #{Float.round(mean, 2)}, std: #{Float.round(std_dev, 2)})")
+    end
+  else
+    Kino.Markdown.new("No data to analyze")
+  end
+end
+
+# Find readings more than 2 standard deviations from mean
+# find_anomalies.(collected_data, 2.0)
+
+# Example with sample data
+find_anomalies.(example_data, 1.5)
+```
+
+## Data Summary Report
+
+Generate a comprehensive report:
+
+```elixir
+generate_report = fn dataset ->
+  stats = analyze_data.(dataset)
+  
+  start_time = List.first(dataset)[:timestamp]
+  end_time = List.last(dataset)[:timestamp]
+  duration = if start_time && end_time do
+    DateTime.diff(end_time, start_time)
+  else
+    0
+  end
+  
+  status_breakdown = dataset
+  |> Enum.group_by(& &1.status)
+  |> Enum.map(fn {status, items} -> 
+    "- #{status}: #{length(items)} samples (#{Float.round(length(items) / length(dataset) * 100, 1)}%)"
+  end)
+  |> Enum.join("\n")
+  
+  Kino.Markdown.new("""
+  # Gas Sensor Data Report
+  
+  ## Collection Summary
+  - **Period:** #{start_time} to #{end_time}
+  - **Duration:** #{duration} seconds (#{Float.round(duration / 60, 1)} minutes)
+  - **Total Samples:** #{stats.count}
+  - **Sampling Rate:** #{Float.round(stats.count / max(duration, 1), 2)} samples/second
+  
+  ## Statistical Summary
+  | Metric | Value |
+  |--------|-------|
+  | Mean | #{stats.mean} ppm |
+  | Median | #{stats.median} ppm |
+  | Std Dev | #{stats.std_dev} ppm |
+  | Min | #{stats.min} ppm |
+  | Max | #{stats.max} ppm |
+  | Range | #{stats.range} ppm |
+  
+  ## Status Distribution
+  #{status_breakdown}
+  
+  ## Recommendations
+  #{if stats.max > 100, do: "⚠️ **WARNING:** High readings detected (max: #{stats.max} ppm)", else: "✅ All readings within safe limits"}
+  
+  #{if stats.std_dev > 10, do: "📊 **NOTE:** High variability detected (σ=#{stats.std_dev})", else: "📊 Readings are stable"}
+  """)
+end
+
+# Generate report for example data
+generate_report.(example_data)
+```
+
+## Best Practices
+
+### For Long-Term Monitoring
+
+1. **Sample efficiently:** Every 5-10 seconds is usually sufficient
+2. **Store data:** Use `export_to_csv` periodically
+3. **Analyze trends:** Run trend detection weekly
+4. **Set thresholds:** Customize based on your sensor's baseline
+
+### Data Storage Strategies
+
+```elixir
+# Option 1: Simple file-based storage
+save_reading = fn reading ->
+  line = "#{DateTime.utc_now()},#{reading.ppm},#{reading.status}\n"
+  File.write!("/path/to/sensor_log.csv", line, [:append])
+end
+
+# Option 2: In-memory with periodic flush
+defmodule DataBuffer do
+  use Agent
+  
+  def start_link do
+    Agent.start_link(fn -> [] end, name: __MODULE__)
+  end
+  
+  def add(reading) do
+    Agent.update(__MODULE__, &[reading | &1])
+  end
+  
+  def get_all do
+    Agent.get(__MODULE__, &Enum.reverse/1)
+  end
+  
+  def flush_to_file(filename) do
+    data = get_all()
+    export_to_csv.(data, filename)
+    Agent.update(__MODULE__, fn _ -> [] end)
+  end
+end
+```
+
+## Next Steps
+
+- Collect data over hours/days for trend analysis
+- Set up automated alerts when thresholds are exceeded
+- Compare data across multiple sensors
+- Correlate with external factors (time of day, weather, etc.)
+
+**Happy Analyzing!** 📊
