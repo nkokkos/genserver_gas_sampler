@@ -39,6 +39,10 @@ defmodule Sampler.MixProject do
       # Nerves Pack for networking
       {:nerves_pack, "~> 0.7.0", targets: @target},
 
+      # add blinky dependency so it always flashs while the app is up
+      # https://github.com/nerves-project/nerves_examples/tree/main/blinky
+      {:delux, "~> 0.4.1", targets: @targets},
+
       # Business logic from local poncho
       {:gas_sensor, path: "../gas_sensor", targets: @target},
 
