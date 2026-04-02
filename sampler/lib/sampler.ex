@@ -8,10 +8,7 @@ defmodule Sampler do
   ## Targets
 
   The firmware supports multiple Nerves targets:
-  - Raspberry Pi (rpi, rpi0, rpi0_2, rpi2, rpi3, rpi3a, rpi4, rpi5)
-  - BeagleBone Black (bbb)
-  - OSD32MP1 (osd32mp1)
-  - x86_64 (x86_64)
+  - Raspberry Pi rpi0
 
   ## Building
 

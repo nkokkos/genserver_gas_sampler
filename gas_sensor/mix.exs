@@ -24,8 +24,16 @@ defmodule GasSensor.MixProject do
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
-    [
-      {:circuits_i2c, "~> 2.0"}
+    [ 
+      {:circuits_i2c,  "~> 2.0"},
+      {:circuits_gpio, "~> 2.1"},
+      {:bmp280, "~> 0.2" },
+     
+      # use the adc1115 for the time being
+      # {:ads1115, "~> 0.1"},
+
+      # add this package https://hex.pm/packages/fostrom
+      # {:fostrom, "~> 0.1.0"}
     ]
   end
 end

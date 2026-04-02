@@ -21,33 +21,31 @@ defmodule Sampler.Application do
   This ensures no I2C contention - only the Sensor GenServer touches the I2C bus.
   """
   use Application
+  require Logger
 
   @impl true
   def start(_type, _args) do
     # OTP applications (gas_sensor and gas_sensor_web) are automatically started
     # as dependencies defined in mix.exs. No manual children needed here.
+   
+    # Just copy pasting from the blinky example:
+    # https://github.com/nerves-project/nerves_examples/blob/main/blinky/lib/blinky/application.ex
+    delux_options = Application.get_all_env(:blinky)
+    Logger.debug("Blinky: target-specific options for Delux: #{inspect(delux_options)}")
 
-    # We can add target-specific workers here if needed in the future
-    children = target_children()
-
+    children = [
+      # See https://hexdocs.pm/delux
+      {Delux, delux_options ++ [initial: Delux.Effects.blink(:on, 2)]}
+    ]
+    
+    # See https://hexdocs.pm/elixir/Supervisor.html
+    # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Sampler.Supervisor]
     Supervisor.start_link(children, opts)
   end
 
-  defp target_children do
-    if Mix.target() == :host do
-      # Host environment - applications are started by mix, 
-      # but we verify the web endpoint is accessible
-      [
-        # Empty - OTP apps handle everything
-      ]
-    else
-      # Target environment - OTP apps start automatically
-      # I2C bus configuration is in config/target.exs
-      [
-        # Empty - OTP apps (gas_sensor and gas_sensor_web) 
-        # start automatically and handle everything
-      ]
-    end
-  end
+
+
+
+
 end
