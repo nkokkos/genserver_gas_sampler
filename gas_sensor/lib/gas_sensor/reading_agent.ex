@@ -15,6 +15,13 @@ defmodule GasSensor.ReadingAgent do
   - `:sample_count` - Total number of samples taken
   - `:timestamp` - When the reading was last updated
 
+  Added 2 new data points based on this Usage
+  https://github.com/elixir-sensors/bmp280
+
+  - humidity_rh   `:humidity_rh`   -  Current temperature
+  - temperature_c `:temperature_c` -  Current humidity
+
+
   ## Usage
 
       # Get current reading (non-blocking, O(1))
@@ -38,6 +45,8 @@ defmodule GasSensor.ReadingAgent do
 
   @default_reading %{
     ppm: 0.0,
+    temperature: 0.0,
+    humidity: 0.0,
     window: [],
     status: :not_started,
     sample_count: 0,
