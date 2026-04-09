@@ -47,9 +47,9 @@ config :logger, backends: [RingLogger]
 # primary application components
 # https://github.com/nerves-project/shoehorn
 
-config :shoehorn,
-  init: [:nerves_runtime, :nerves_pack],
-  app:  :sampler
+#config :shoehorn,
+#  init: [:nerves_runtime, :nerves_pack],
+#  app:  :sampler
 
 # Picks ups configuration based on the host
 # What it does: host.exs contains settings for our host(laptop). For 

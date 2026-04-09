@@ -7,7 +7,8 @@ import Config
 config :vintage_net,
   regulatory_domain: "US",
   config: [
-    {"wlan0", %{type: VintageNetWiFi}}
+    #{"wlan0", %{type: VintageNetWiFi}}
+    {"usb0", %{type: VintageNetDirect}}
   ]
 
 # Configure gas_sensor I2C settings
@@ -42,10 +43,10 @@ config :nerves_time, :servers, [
 # config :nerves_time, :sync_interval, 600  # seconds
 
 # Configure gas_sensor_web for production on device
-config :gas_sensor_web, GasSensorWeb.Endpoint,
-  url: [host: "0.0.0.0", port: 80],
-  server: true,
-  check_origin: false
+#config :gas_sensor_web, GasSensorWeb.Endpoint,
+#  url: [host: "0.0.0.0", port: 80],
+#  server: true,
+#  check_origin: false
 
 # Shoehorn configuration
 config :shoehorn,
@@ -55,9 +56,11 @@ config :shoehorn,
 # Nerves runtime configuration
 config :nerves_runtime, :kernel, use_system_registry: true
 
+config :logger, RingLogger, persist_path: "/data/logs"
+
 # Logger configuration for embedded (reduce memory usage)
-config :logger,
-  level: :warning,
-  backends: [RingLogger],
-  ring_size: 1024,
-  flush: true
+#config :logger,
+#  level: :warning,
+#  backends: [RingLogger],
+#  ring_size: 1024,
+#  flush: true

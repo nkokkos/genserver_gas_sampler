@@ -10,7 +10,7 @@ defmodule Sampler.MixProject do
     [
       app: @app,
       version: @version,
-      elixir: "~> 1.15",
+      elixir: "~> 1.16",
       archives: [nerves_bootstrap: "~> 1.14"],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -40,20 +40,31 @@ defmodule Sampler.MixProject do
       {:nerves_pack, "~> 0.7.0", targets: @target},
 
       # Raspberry Pi Zero system - the only target - our app will live on a rasberry pi wiress zero
-      {:nerves_system_rpi0, "~> 1.27", runtime: false, targets: @target},
+      {:nerves_system_rpi0, "~> 2.0", runtime: false, targets: @target},
+
+      # enable gadget mode:
+      #{:vintage_net_direct, "~> 0.10.7", targets: @target},
+      #{:vintage_net_wizard, "~> 0.4",  targets: @target},
 
       # add blinky dependency so it always flashes while the app is up
       # https://github.com/nerves-project/nerves_examples/tree/main/blinky
       {:delux, "~> 0.4.1", targets: @target},
 
+      {:circuits_i2c,  "~> 2.0"},
+
+      # Use Bosch barometric pressure sensors in Elixir 
+      # use this librar maintained by Frank Hunleth:
+      # https://github.com/elixir-sensors/bmp280
+      {:bmp280, "~> 0.2" },
+
       # Business logic from local poncho
       # This app contains all the logic needed to read the sensors and
       # push the data out
-      {:gas_sensor, path: "../gas_sensor", targets: @target},
+      # {:gas_sensor, path: "../gas_sensor", targets: @target},
 
       # Phoenix web interface that sports a simple web page that displays
       # data in live view
-      {:gas_sensor_web, path: "../gas_sensor_web", targets: @target},
+      #{:gas_sensor_web, path: "../gas_sensor_web", targets: @target},
     
     ]
   end
@@ -67,7 +78,7 @@ defmodule Sampler.MixProject do
       include_erts: &Nerves.Release.erts/0,
       steps: [&Nerves.Release.init/1, :assemble],
       strip_beams: Mix.env() == :prod
-      # rel/vm.args.eex contains VM optimizations for Pi Zero W
+      #rel/vm.args.eex contains VM optimizations for Pi Zero W
     ]
   end
 end

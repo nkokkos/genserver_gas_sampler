@@ -30,7 +30,7 @@ defmodule Sampler.Application do
    
     # Just copy pasting from the blinky example:
     # https://github.com/nerves-project/nerves_examples/blob/main/blinky/lib/blinky/application.ex
-    delux_options = Application.get_all_env(:blinky)
+    delux_options = Application.get_all_env(:sampler)
     Logger.debug("Blinky: target-specific options for Delux: #{inspect(delux_options)}")
 
     children = [

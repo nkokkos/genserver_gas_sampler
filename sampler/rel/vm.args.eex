@@ -1,73 +1,61 @@
-# VM Args for Raspberry Pi Zero W
-# Optimized for single-core, 512MB RAM
-# This file is evaluated at runtime
+## Customize flags given to the VM: https://www.erlang.org/doc/apps/erts/erl_cmd.html
 
-# Scheduler settings for single-core Pi Zero
-+S 1              # Use only 1 scheduler thread (Pi Zero is single-core)
-+A 4              # Reduce async I/O threads from default 10 to 4
-+SDio 1           # 1 dirty I/O scheduler (reduced from default)
+## Do not set -name or -sname here. Prefer configuring them at runtime
+## Configure -setcookie in the mix.exs release section or at runtime
 
-# Disable scheduler busy waiting to save CPU and power
+## Number of dirty schedulers doing IO work (file, sockets, and others)
+##+SDio 5
+
+## Increase number of concurrent ports/sockets
+##+Q 65536
+
+## Tweak GC to run more often
+##-env ERL_FULLSWEEP_AFTER 10
+
+## Use Ctrl-C to interrupt the current shell rather than invoking the emulator's
+## break handler and possibly exiting the VM.
++Bc
+
+# Allow time warps so that the Erlang system time can more closely match the
+# OS system time.
++C multi_time_warp
+
+## Choose whether to load all code at system startup
+## See https://www.erlang.org/doc/system/system_principles.html#code-loading-strategy
+## Slow devices sometimes benefit from choosing embedded mode
+##-mode interactive
+
+# Load code as per the boot script since not using archives
+# See https://www.erlang.org/doc/man/init.html#command-line-flags
+-code_path_choice strict
+
+## Disable scheduler busy wait to reduce idle CPU usage and avoid delaying
+## other OS processes. See https://www.erlang.org/doc/apps/erts/erl_cmd.html#+sbwt
 +sbwt none
-+swt very_low     # Very low scheduler wake cleanup threshold
++sbwtdcpu none
++sbwtdio none
 
-# Memory allocator settings for embedded (reduce fragmentation)
-+MBas aobf        # Binary allocator strategy: address order best fit
-+MBlmbcs 512     # Large block multiblock carrier size
-+MBlmcs 256      # Large block maximum carrier size
-+MBsmcs 256      # Small block maximum carrier size
+## Save the shell history between reboots
+## See https://www.erlang.org/doc/apps/kernel/kernel_app for additional options
+-kernel shell_history enabled
 
-# ETS allocator
-+MEas aobf
-+MElmbcs 512
-+MElmcs 256
-+MEsmcs 256
+## Enable heartbeat monitoring of the Erlang runtime system
+-heart -env HEART_BEAT_TIMEOUT 30
 
-# Heap allocator
-+MHlmbcs 512
-+MHlmcs 256
-+MHsmcs 256
+## Start the Elixir shell
 
-# String/binary allocator
-+MSlmbcs 512
-+MSlmcs 256
-+MSsmcs 256
+-noshell
+-user elixir
+-run elixir start_cli
 
-# Thread progress settings
-+SPg true         # Thread-global progress
 
-# Memory limits (in words, 8 bytes each on 64-bit)
-# Max heap ~96MB, leaving room for OS and NIFs
-+hmw 12582912     # Max heap: 12M words = ~96MB
-+hms 4194304      # Min heap: 4M words = ~32MB
-+hmbs 1048576     # Heap block: 1M words = ~8MB
+## Enable colors in the shell
+-elixir ansi_enabled true
 
-# Stack sizes (in words)
-+sss 64           # Small stack: 64 words
-+ss 256           # Normal stack: 256 words
-
-# Character encoding
-+pc unicode       # Default to Unicode
-
-# Time settings
-+c true           # Enable time correction
-+C no_time_warp   # No time warp mode
-
-# Distribution (disabled for embedded)
--kernel inet_dist_listen_min 4370 inet_dist_listen_max 4370
-
-# Heartbeat (optional, enables auto-restart if VM hangs)
--heart -env HEART_BEAT_TIMEOUT 60
-
-# Cookie for distributed Erlang (Livebook access)
-# This cookie must match the one used by Livebook to connect
--setcookie gassensor_demo_cookie_2024
-
-# Node name for distribution (required for Livebook/Observer access)
-# Using host name 'nerves.local' for easy discovery
--name sampler@nerves.local
-
-# EPMD (Erlang Port Mapper Daemon) settings
-# Bind to all interfaces so Livebook can connect over network
--kernel inet_dist_listen_min 4370 inet_dist_listen_max 4370
--kernel inet_dist_use_interface {0,0,0,0}
+## Options added after -extra are interpreted as plain arguments and can be
+## retrieved using :init.get_plain_arguments(). Options before the "--" are
+## interpreted by Elixir and anything afterwards is left around for other IEx
+## and user applications.
+-extra --no-halt
+--
+--dot-iex /etc/iex.exs

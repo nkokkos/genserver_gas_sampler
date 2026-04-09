@@ -21,7 +21,7 @@ defmodule GasSensor.MixProject do
       mod: {GasSensor.Application, []}
     ]
   end
-
+  
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [ 
