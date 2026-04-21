@@ -1,6 +1,6 @@
 defmodule GasSensor.ReadingAgent do
   @moduledoc """
-  Agent that stores the latest sensor reading for non-blocking access.
+  Agent that stores the latest sensor readingis for non-blocking access.
 
   This Agent acts as a read-optimized cache between the I2C-reading GenServer
   and the Phoenix web interface. It prevents I2C bus contention by ensuring
@@ -10,7 +10,7 @@ defmodule GasSensor.ReadingAgent do
 
   The Agent stores a map with the following keys:
   - `:ppm` - Current CO concentration in parts per million
-  - `:window` - Last 7 samples for median calculation
+  - `:window` - Last 11 samples for median calculation
   - `:status` - Sensor status (:ok, :error, :not_started)
   - `:sample_count` - Total number of samples taken
   - `:timestamp` - When the reading was last updated
@@ -18,9 +18,11 @@ defmodule GasSensor.ReadingAgent do
   Added 2 new data points based on this Usage
   https://github.com/elixir-sensors/bmp280
 
-  - humidity_rh   `:humidity_rh`   -  Current temperature
-  - temperature_c `:temperature_c` -  Current humidity
+  - humidity    `:humidity`    -  Current temperature
+  - temperature `:temperature` -  Current humidity
 
+  Added hardwarecore temperature
+  - hardware_core_temp `:hardware_core_temp` - Temperature for the rasberry cpu
 
   ## Usage
 
@@ -47,6 +49,7 @@ defmodule GasSensor.ReadingAgent do
     ppm: 0.0,
     temperature: 0.0,
     humidity: 0.0,
+    hardware_core_temp: 0.0,
     window: [],
     status: :not_started,
     sample_count: 0,

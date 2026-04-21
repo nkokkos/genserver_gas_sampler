@@ -56,7 +56,7 @@ defmodule GasSensor.Application do
     children = [
       # Layer 1: ReadingAgent - stores current reading
       # No dependencies, minimal memory (~200 bytes)
-      GasSensor.ReadingAgent,
+      # GasSensor.ReadingAgent,
 
       # Layer 2: History - 24-hour ETS-based circular buffer
       # No dependencies, ~900KB for 17,280 samples
@@ -66,7 +66,7 @@ defmodule GasSensor.Application do
       # Layer 3: Sensor - only process that touches I2C
       # Depends on ReadingAgent and History (must start after)
       # Pass I2C bus configuration from app config
-      {GasSensor.Sensor, [i2c_bus: i2c_bus]}
+      # {GasSensor.Sensor, [i2c_bus: i2c_bus]}
     ]
 
     opts = [strategy: :one_for_one, name: GasSensor.Supervisor]

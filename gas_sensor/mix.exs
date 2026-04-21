@@ -7,8 +7,8 @@ defmodule GasSensor.MixProject do
   def project do
     [
       app: :gas_sensor,
-      version: "0.1.0",
-      elixir: "~> 1.15",
+      version: "0.1.1",
+      elixir: "~> 1.16",
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
@@ -17,8 +17,8 @@ defmodule GasSensor.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
-      mod: {GasSensor.Application, []}
+      mod: {GasSensor.Application, []},
+      extra_applications: [:logger, :runtime_tools]
     ]
   end
   
@@ -26,12 +26,12 @@ defmodule GasSensor.MixProject do
   defp deps do
     [ 
       {:circuits_i2c,  "~> 2.0"},
-      {:circuits_gpio, "~> 2.1"},
+      #{:circuits_gpio, "~> 2.1"},
 
       # Use Bosch barometric pressure sensors in Elixir 
       # use this librar maintained by Frank Hunleth:
       # https://github.com/elixir-sensors/bmp280
-      {:bmp280, "~> 0.2" },
+      {:bmp280, "~> 0.2" }
       
       # use the adc1115 for the time being
       # {:ads1115, "~> 0.1"},

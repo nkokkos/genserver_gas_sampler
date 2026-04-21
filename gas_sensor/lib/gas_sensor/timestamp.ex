@@ -147,7 +147,10 @@ defmodule GasSensor.Timestamp do
   def provisional_timestamp do
     # Base: firmware build date (assumed 2024 for this firmware)
     # You should update this to match your actual build date
-    build_date = Application.get_env(:gas_sensor, :firmware_build_date, ~U[2024-03-30 00:00:00Z])
+    # build_date = Application.get_env(:gas_sensor, :firmware_build_date, ~U[2024-03-30 00:00:00Z])
+    
+    # Grab the build date automatically:
+    build_date = Nerves.Runtime.KV.get_active("nerves_fw_build_date") |> DateTime.from_iso8601()
 
     # Add monotonic offset for uniqueness
     elapsed_ms = System.monotonic_time(:millisecond) - boot_time_ms()

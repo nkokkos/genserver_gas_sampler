@@ -25,6 +25,7 @@ defmodule Sampler.Application do
 
   @impl true
   def start(_type, _args) do
+
     # OTP applications (gas_sensor and gas_sensor_web) are automatically started
     # as dependencies defined in mix.exs. No manual children needed here.
    

@@ -31,6 +31,7 @@ defmodule GasSensor.Sensor do
   use GenServer
   require Logger
   import Bitwise
+  alias GasSensor.Timestamp
 
   # ADS1115 I2C address
   @ads1115_addr 0x48
@@ -59,9 +60,9 @@ defmodule GasSensor.Sensor do
   @sample_interval div(@total_window, @num_samples)
 
   # Sensor calibration - UPDATE THESE VALUES based on your sensor!
-  @sensitivity_na_per_ppm 1.827
+  @sensitivity_na_per_ppm 1.523
   @r3_ohms 1_200_000
-  @divider_factor 2.0
+  @divider_factor ( 9.95 / (9.95 + 9.95) ) 
 
   # ── Public API ──────────────────────────────────────────
 
