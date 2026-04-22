@@ -1,28 +1,17 @@
 defmodule GasSensor.ReadingAgent do
   @moduledoc """
-  Agent that stores the latest sensor readingis for non-blocking access.
+
+  Agent that stores the latest sensor readings for non-blocking access.
 
   This Agent acts as a read-optimized cache between the I2C-reading GenServer
   and the Phoenix web interface. It prevents I2C bus contention by ensuring
   only the GenServer performs I2C operations.
 
-  ## Architecture
+  Stores the latest sensor reading for non-blocking access by the web interface.
 
-  The Agent stores a map with the following keys:
-  - `:ppm` - Current CO concentration in parts per million
-  - `:window` - Last 11 samples for median calculation
-  - `:status` - Sensor status (:ok, :error, :not_started)
-  - `:sample_count` - Total number of samples taken
-  - `:timestamp` - When the reading was last updated
+  Only the Sensor GenServer writes here. Phoenix LiveView reads from here.
 
-  Added 2 new data points based on this Usage
-  https://github.com/elixir-sensors/bmp280
-
-  - humidity    `:humidity`    -  Current temperature
-  - temperature `:temperature` -  Current humidity
-
-  Added hardwarecore temperature
-  - hardware_core_temp `:hardware_core_temp` - Temperature for the rasberry cpu
+  Prevents I2C bus contention — web requests never wait for hardware.
 
   ## Usage
 
@@ -45,17 +34,20 @@ defmodule GasSensor.ReadingAgent do
   4. **Better Concurrency**: Multiple web requests can read simultaneously without GenServer bottlenecks
   """
 
+  # window is used to calculate the median from the samples
+  # time_reliable is true when NTP has synced (RTC-less systems)
+
   @default_reading %{
-    ppm: 0.0,
-    temperature: 0.0,
-    humidity: 0.0,
-    hardware_core_temp: 0.0,
-    window: [],
-    status: :not_started,
-    sample_count: 0,
-    timestamp: nil,
-    # True when NTP has synced (RTC-less systems)
-    time_reliable: false
+    co_ppm: 		 0.0,
+    temperature: 	 0.0,
+    humidity_rh: 	 0.0,
+    dew_point_c:	 0.0,
+    gas_resistance_ohms: 0.0,
+    cpu_temperature:     0.0,
+    window: 		 [],
+    timestamp: 		 nil,  
+    status:		 :not_started,
+    time_reliable:       false
   }
 
   @agent_name __MODULE__
@@ -77,7 +69,7 @@ defmodule GasSensor.ReadingAgent do
   ## Examples
 
       iex> GasSensor.ReadingAgent.get_reading()
-      %{ppm: 45.32, window: [45.1, 45.5, 45.2], status: :ok, sample_count: 150, timestamp: ~U[2024-01-15 10:30:00Z]}
+      %{co_ppm: 45.32, temperature: 30.0, .... window: [45.1, 45.5, 45.2,.....], status: :ok, timestamp: ~U[2024-01-15 10:30:00Z]}
   """
   def get_reading do
     Agent.get(@agent_name, & &1)

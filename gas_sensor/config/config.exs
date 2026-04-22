@@ -5,4 +5,4 @@ config :gas_sensor,
   i2c_bus: "i2c-1"
 
 # Target-specific configuration
-# import_config "#{Mix.target()}.exs"
+import_config "#{Mix.target()}.exs"

@@ -147,6 +147,31 @@ defmodule GasSensor.Sensor do
 
   @impl true
   def handle_info(:collect_sample, state) do
+
+   @doc """  
+     # always get readings from the bme sensor before moving to something else
+     # use the elevation to pass as a parameter the elevation of your place:
+     https://www.freemaptools.com/elevation-finder.htm 
+     # examples:
+     iex> {:ok, bmp} = BMP280.start_link(bus_name: "i2c-1", bus_address: 0x77)
+     {:ok, #PID<0.29929.0>}
+     iex> BMP280.measure(bmp)
+     {:ok,
+     %BMP280.Measurement{
+       altitude_m: 138.96206905098805,
+       dew_point_c: 2.629181073094435,
+       gas_resistance_ohms: 5279.474749704044,
+       humidity_rh: 34.39681642351278,
+       pressure_pa: 100818.86273677988,
+       temperature_c: 18.645856498100876,
+       timestamp_ms: 885906
+     }}
+
+     BMP280.force_altitude(bmp, 100)
+    :ok
+
+  """
+
     new_state =
       case read_ads1115(state.i2c) do
         {:ok, ppm} ->
