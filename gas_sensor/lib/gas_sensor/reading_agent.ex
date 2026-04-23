@@ -38,16 +38,16 @@ defmodule GasSensor.ReadingAgent do
   # time_reliable is true when NTP has synced (RTC-less systems)
 
   @default_reading %{
-    co_ppm: 		 0.0,
-    temperature: 	 0.0,
-    humidity_rh: 	 0.0,
-    dew_point_c:	 0.0,
-    gas_resistance_ohms: 0.0,
-    cpu_temperature:     0.0,
-    window: 		 [],
-    timestamp: 		 nil,  
-    status:		 :not_started,
-    time_reliable:       false
+    co_ppm:               0.0,
+    temperature:          0.0,
+    humidity_rh:          0.0,
+    dew_point_c:          0.0,
+    gas_resistance_ohms:  0.0,
+    cpu_temperature:      0.0,
+    window:               [],
+    timestamp:            nil,  
+    time_reliable:	  false,
+    status:               :not_started,
   }
 
   @agent_name __MODULE__
@@ -124,7 +124,7 @@ defmodule GasSensor.ReadingAgent do
 
   ## Parameters
 
-    * `reading` - Map containing :ppm, :window, :status, :sample_count
+    * `reading` - Map containing :ppm, :window, :status, and all the othe readings
   """
   def update(reading) when is_map(reading) do
     # Check time reliability

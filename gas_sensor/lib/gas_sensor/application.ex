@@ -54,10 +54,11 @@ defmodule GasSensor.Application do
     i2c_bus = Application.get_env(:gas_sensor, :i2c_bus, "i2c-1")
 
     children = [
-      # Layer 1: ReadingAgent - stores current reading
-      # No dependencies, minimal memory (~200 bytes)
-      # GasSensor.ReadingAgent,
+      #1. Agent starts first. Always available for web requests 
+      GasSensor.ReadingAgent
 
+      #2. BMP 280 Genserver. Starts its own I2C connection and provides data 
+ 
       # Layer 2: History - 24-hour ETS-based circular buffer
       # No dependencies, ~900KB for 17,280 samples
       # Provides time-series data for graphing and analysis

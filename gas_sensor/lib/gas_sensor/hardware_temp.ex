@@ -27,7 +27,7 @@ defmodule GasSensor.HardwareTemp do
         _ -> 25.0
       end
     else
-      # Fallback for your VirtualBox/Vagrant environment
+      # Fallback for your host development environement like VirtualBox environment
       # This generates a random float between 35.0 and 45.0
       :rand.uniform() * 10 + 35
       |> Float.round(1)

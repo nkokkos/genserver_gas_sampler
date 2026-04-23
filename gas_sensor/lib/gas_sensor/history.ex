@@ -24,7 +24,6 @@ defmodule GasSensor.History do
 
   - 17,280 samples/day × ~52 bytes = ~900KB total
   - Pi Zero W has ~300MB available for BEAM
-  - Uses only 0.3% of available memory ✅
 
   ## Why ETS?
 
@@ -63,8 +62,9 @@ defmodule GasSensor.History do
   require Logger
 
   @table_name :sensor_history
-  # 24 hours
-  @retention_seconds 86_400
+  # 7 days hours
+  @retention_seconds 	604_800 # keep data up to 7 days
+  @max_retention_hours	168
   # Cleanup every 60 seconds
   @cleanup_interval 60_000
   # Maximum points to render
@@ -90,22 +90,37 @@ defmodule GasSensor.History do
       GasSensor.History.add_sample(45.2, :ok)
       GasSensor.History.add_sample(0.0, :error)
   """
-  def add_sample(ppm, status) when is_number(ppm) and is_atom(status) do
-    # Check time reliability and use appropriate timestamp
+  def add_sample(%{
+    co_ppm: _,
+    temperature: _,
+    humidity_rh: _,
+    dew_point_c: _,
+    gas_resistance_ohms: _,
+    cpu_temperature: _
+  } = reading,status) when is_atom(status) do 
     {timestamp, reliable?} = GasSensor.Timestamp.now_with_reliability()
-
-    # If offline, use provisional timestamp for better UX
-    # (build date + monotonic offset instead of 1970 epoch)
     final_timestamp =
-      if reliable? do
-        timestamp
-      else
-        GasSensor.Timestamp.provisional_timestamp()
-      end
-
-    :ets.insert(@table_name, {final_timestamp, ppm, status})
+      if reliable?, do: timestamp, else: GasSensor.Timestamp.provisional_timestamp()
+    :ets.insert(@table_name, {final_timestamp, reading})
     :ok
   end
+  
+  #def add_sample(ppm, status) when is_number(ppm) and is_atom(status) do
+  #  # Check time reliability and use appropriate timestamp
+  #  {timestamp, reliable?} = GasSensor.Timestamp.now_with_reliability()
+  #
+  #  # If offline, use provisional timestamp for better UX
+  #  # (build date + monotonic offset instead of 1970 epoch)
+  #  final_timestamp =
+  #    if reliable? do
+  #      timestamp
+  #    else
+  #      GasSensor.Timestamp.provisional_timestamp()
+  #    end
+  #
+  #  :ets.insert(@table_name, {final_timestamp, ppm, status})
+  #  :ok
+  #end
 
   @doc """
   Gets all samples from the last 24 hours.
