@@ -1,6 +1,6 @@
 defmodule GasSensor.History do
   @moduledoc """
-  ETS-based circular buffer for 24-hour sensor history.
+  ETS-based circular buffer for 7 days sensor history.
 
   This module stores all sensor readings in an in-memory ETS table,
   providing O(1) access to historical data for graphing and analysis.
@@ -12,8 +12,8 @@ defmodule GasSensor.History do
   Sensor GenServer ──→ ETS Table (ordered_set)
                            │
                            ├── Key: timestamp (DateTime)
-                           ├── Val: {ppm, status}
-                           └── Size: 17,280 entries max (~900KB)
+                           ├── Val: reading tuple structure, see below
+                           └── Size: 60,480 samples × 400 bytes ≈ 24,192,000 bytes. Zero W has ~300MB available for BEAM
                            │
                            ↓
                     Phoenix LiveView
@@ -22,7 +22,10 @@ defmodule GasSensor.History do
 
   ## Memory Efficiency
 
-  - 17,280 samples/day × ~52 bytes = ~900KB total
+  We sample every 10 seconds for the maximum time of 7 days = 604800 seconds / 10 seconds = 60,480 samples 
+  in 7 days
+
+  - 60,480 samples × 400 bytes ≈ 24,192,000 bytes
   - Pi Zero W has ~300MB available for BEAM
 
   ## Why ETS?
@@ -43,13 +46,17 @@ defmodule GasSensor.History do
   ## Usage
 
       # Add a reading (called by Sensor GenServer)
-      GasSensor.History.add_sample(45.2, :ok)
+      reading = tuple that contains the timestamp and all the readings
+      GasSensor.History.add_sample(reading, :ok)
 
       # Get last 24 hours
       samples = GasSensor.History.get_last_24h()
-
-      # Get downsampled data for graph (300 points max)
-      graph_data = GasSensor.History.get_for_graph(300)
+   
+      # Get last 7 days 
+      samples = GasSensor.History.get_last_7_days()
+   
+      # Get downsampled data for graph (400 points max)
+      graph_data = GasSensor.History.get_for_graph(400)
 
       # Get specific time range
       range = GasSensor.History.get_range(
@@ -61,14 +68,27 @@ defmodule GasSensor.History do
   use GenServer
   require Logger
 
+  # table name used in ETS storage scheme
   @table_name :sensor_history
-  # 7 days hours
-  @retention_seconds 	604_800 # keep data up to 7 days
-  @max_retention_hours	168
-  # Cleanup every 60 seconds
+
+  # 7 days retention
+  @retention_seconds		604800 # 7 days in seconds
+
+  # 24 hours retention
+  @retention_seconds_24h	86400  # 24 hours in seconds 
+
+  # 7 days in hours:
+  @max_retention_hours		168    # 7 days in hours
+  
+  # Cleanup every 60 seconds, 60_000 here refers to milliseconds
   @cleanup_interval 60_000
-  # Maximum points to render
-  @max_samples_for_graph 300
+  
+  # Maximum points to render for 24 hours
+  @max_samples_for_graph 400
+
+  # Maximum points to render for 7 days = 168 hours
+  @max_samples_for_7_days_graph 300
+
 
   # ── Public API ──────────────────────────────────────────
 
@@ -86,51 +106,64 @@ defmodule GasSensor.History do
   Automatically includes timestamp.
 
   ## Examples
+    ok_reading = %{
+      co_ppm: 50,
+      temperature_c: 34,
+      humidity_rh: 80,
+      dew_point_c: 2.629,
+      gas_resistance_ohms: 5279.474,
+      pressure_pa: 100818.86273677988,
+      cpu_temperature: 35,
+      status: :ok # Add a status flag for easy filtering
+    }
 
-      GasSensor.History.add_sample(45.2, :ok)
-      GasSensor.History.add_sample(0.0, :error)
+    null_reading = %{
+      co_ppm: nil,
+      temperature_c: nil,
+      humidity_rh: nil,
+      dew_point_c: nil,
+      gas_resistance_ohms: nil,
+      pressure_pa: nil,
+      cpu_temperature: nil,
+      status: :error # Add a status flag for easy filtering
+    }
+ 
+      GasSensor.History.add_sample(ok_reading,   :ok)
+      GasSensor.History.add_sample(null_reading, :error)
   """
   def add_sample(%{
     co_ppm: _,
-    temperature: _,
+    temperature_c: _,
     humidity_rh: _,
     dew_point_c: _,
     gas_resistance_ohms: _,
+    pressure_pa: _,
     cpu_temperature: _
-  } = reading,status) when is_atom(status) do 
+  } = reading, status) when is_atom(status) do 
     {timestamp, reliable?} = GasSensor.Timestamp.now_with_reliability()
     final_timestamp =
       if reliable?, do: timestamp, else: GasSensor.Timestamp.provisional_timestamp()
     :ets.insert(@table_name, {final_timestamp, reading})
     :ok
   end
-  
-  #def add_sample(ppm, status) when is_number(ppm) and is_atom(status) do
-  #  # Check time reliability and use appropriate timestamp
-  #  {timestamp, reliable?} = GasSensor.Timestamp.now_with_reliability()
-  #
-  #  # If offline, use provisional timestamp for better UX
-  #  # (build date + monotonic offset instead of 1970 epoch)
-  #  final_timestamp =
-  #    if reliable? do
-  #      timestamp
-  #    else
-  #      GasSensor.Timestamp.provisional_timestamp()
-  #    end
-  #
-  #  :ets.insert(@table_name, {final_timestamp, ppm, status})
-  #  :ok
-  #end
 
   @doc """
   Gets all samples from the last 24 hours.
-
-  Returns list of %{timestamp: DateTime, ppm: float, status: atom}
+  Returns list of %{timestamp: DateTime, reading_tuple, status: atom}
   """
   def get_last_24h do
     # Use reliable timestamp (handles Pi Zero W without RTC)
-    cutoff = DateTime.add(GasSensor.Timestamp.now(), -@retention_seconds)
+    cutoff = DateTime.add(GasSensor.Timestamp.now(), -@retention_seconds_24h)
     get_since(cutoff)
+  end
+
+  @doc """
+  Gets all samples from the last 7 days
+  """
+  def get_last_7_days do 
+   # Use reliable timestamp (handles Pi Zero W without RTC)
+   cutoff = DateTime.add(GasSensor.Timestamp.now(), -@retention_seconds)
+   get_since(cutoff)
   end
 
   @doc """
@@ -143,74 +176,75 @@ defmodule GasSensor.History do
       samples = GasSensor.History.get_since(one_hour_ago)
   """
   def get_since(%DateTime{} = datetime) do
-    # ETS ordered_set allows efficient range queries
-    # Match spec: {timestamp, ppm, status} where timestamp >= datetime
+    # Match spec for a 2-element tuple: {timestamp, reading_map}
+    # $1 is the timestamp, $2 is the map containing your 7 metrics
     match_spec = [
-      {{:"$1", :"$2", :"$3"}, [{:>=, :"$1", {:const, datetime}}], [{{:"$1", :"$2", :"$3"}}]}
+      {
+        {:"$1", :"$2"},                      # Pattern to match
+        [{:>=, :"$1", {:const, datetime}}],  # Filter: timestamp >= datetime
+        [{{:"$1", :"$2"}}]                   # Result format: return the whole tuple
+      }
     ]
 
     @table_name
     |> :ets.select(match_spec)
-    |> Enum.map(fn {ts, ppm, status} ->
-      %{timestamp: ts, ppm: ppm, status: status}
+    |> Enum.map(fn {ts, reading} ->
+      # reading is the map %{co_ppm: _, temperature_c: _, ...}
+      # We inject the timestamp into the map so the graphing tool has it in the same object
+      Map.put(reading, :timestamp, ts)
     end)
+    # Since it's an :ordered_set, it's already sorted by timestamp.
+    # This sort is just a safety measure for the graphing engine.
     |> Enum.sort_by(& &1.timestamp, DateTime)
   end
+
 
   @doc """
   Gets samples for graphing with automatic downsampling.
 
   Returns at most `max_points` samples by using min-max downsampling
-  (LTTB - Largest Triangle Three Buckets algorithm for visual accuracy).
+  The best algorithm would be LTTB - Largest Triangle Three Buckets algorithm for visual accuracy.
+  But it requires a strong cpu and the rasberry pi is not that strong
+   
 
   ## Parameters
 
-    * `max_points` - Maximum number of points to return (default: 300)
+    * `max_points` - Maximum number of points to return (default: 400 for 24 hours)
 
   ## Examples
 
-      # Get 24h history downsampled to 300 points for graph
-      data = GasSensor.History.get_for_graph(300)
+      # Get 24h history downsampled to 400 points for graph
+      data = GasSensor.History.get_for_graph(400)
+
+      # Get 7 days history downsampled for 300 points for graph
+      data = GasSensor.History.get_for_7_days_graph()
+     
   """
   def get_for_graph(max_points \\ @max_samples_for_graph) do
     samples = get_last_24h()
     downsample(samples, max_points)
   end
 
-  @doc """
-  Gets statistics for the last 24 hours.
-
-  Returns %{count: int, min: float, max: float, avg: float, median: float}
-  """
-  def get_stats_24h do
-    samples = get_last_24h()
-
-    if length(samples) > 0 do
-      ppms = Enum.map(samples, & &1.ppm)
-
-      %{
-        count: length(samples),
-        min: Enum.min(ppms),
-        max: Enum.max(ppms),
-        avg: Enum.sum(ppms) / length(ppms),
-        median: calculate_median(ppms)
-      }
-    else
-      %{count: 0, min: 0.0, max: 0.0, avg: 0.0, median: 0.0}
-    end
+  def get_for_7_days_graph(max_points \\ @max_samples_for_7_days_graph) do
+    samples = get_last_7_days()
+    downsample(samples, max_points)
   end
 
   @doc """
   Gets the oldest sample in the history.
   """
   def get_oldest do
+    # :ets.first returns the very first key in the :ordered_set (the newest time)
     case :ets.first(@table_name) do
       :"$end_of_table" ->
-        nil
+      nil
 
-      timestamp ->
-        [{^timestamp, ppm, status}] = :ets.lookup(@table_name, timestamp)
-        %{timestamp: timestamp, ppm: ppm, status: status}
+    timestamp ->
+      # We look up the key and get back our 2-element tuple
+      [{^timestamp, reading}] = :ets.lookup(@table_name, timestamp)
+
+      # We merge the timestamp into the map so it's easy to use in Phoenix Live View
+      Map.put(reading, :timestamp, timestamp)
     end
   end
 
@@ -218,13 +252,17 @@ defmodule GasSensor.History do
   Gets the newest sample in the history.
   """
   def get_newest do
+    # :ets.last returns the very last key in the :ordered_set (the latest time)
     case :ets.last(@table_name) do
       :"$end_of_table" ->
-        nil
+      nil
 
-      timestamp ->
-        [{^timestamp, ppm, status}] = :ets.lookup(@table_name, timestamp)
-        %{timestamp: timestamp, ppm: ppm, status: status}
+    timestamp ->
+      # We look up the key and get back our 2-element tuple using the pin operator
+      [{^timestamp, reading}] = :ets.lookup(@table_name, timestamp)
+      
+      # We merge the timestamp into the map so it's easy to use in Phoenix Live View
+      Map.put(reading, :timestamp, timestamp)
     end
   end
 
@@ -248,6 +286,7 @@ defmodule GasSensor.History do
   def init(_) do
     # Create ETS table with ordered_set for efficient time range queries
     # public = allows concurrent reads without going through GenServer
+    # See more there about ETS https://elixirschool.com/en/lessons/storage/ets
     table =
       :ets.new(@table_name, [
         # Keeps entries sorted by key (timestamp)
@@ -282,59 +321,108 @@ defmodule GasSensor.History do
     Process.send_after(self(), :cleanup, @cleanup_interval)
   end
 
+  
   defp cleanup_old_entries do
-    # Use reliable timestamp for cutoff calculation
+    # Calculate the "Expiration Date"
     cutoff = DateTime.add(GasSensor.Timestamp.now(), -@retention_seconds)
 
-    # Delete all entries older than retention period
-    # ordered_set allows efficient deletion from beginning
-    :ets.select_delete(@table_name, [
-      {{:"$1", :"$2", :"$3"}, [{:<, :"$1", {:const, cutoff}}], [true]}
-    ])
+    # match_spec for 2-element tuple: {timestamp, reading_map}
+    # $1 = timestamp, $2 = map
+    match_spec = [
+      {
+        {:"$1", :"$2"},                  # Look for these 2-item tuples
+        [{:<, :"$1", {:const, cutoff}}], # Condition: where timestamp is LESS THAN cutoff
+        [true]                           # Return true = "Yes, delete this"
+      }
+    ]
+
+    :ets.select_delete(@table_name, match_spec)
 
     :ok
   end
 
-  defp downsample(samples, max_points) when length(samples) <= max_points do
-    samples
-  end
+  @doc """
+  Reduces the number of data points (decimation) for visualization performance  while preserving critical environmental events.
+
+  ## Why Downsampling?
+  - **Hardware Constraints:** The Raspberry Pi Zero W has limited memory; sending 100k+ 
+    rows to a browser for graphing can cause the Phoenix channel or the client's browser to crash.
+  - **Visual Clarity:** A 650px chart cannot physically display more than ~650 vertical 
+    lines of data. Excess points cause "aliasing" and visual noise.
+  - **Data Preservation:** Unlike simple averaging (which hides gas spikes), this 
+    algorithm uses a **Min-Max Bucket** strategy to ensure safety-critical events 
+    (like CO peaks) remain visible.
+
+  ## The Algorithm: Representative Peak Selection
+  1. **Bucket Calculation:** Divides the dataset into `n` equal temporal buckets.
+  2. **Feature Extraction:** For every bucket, it identifies:
+      - The **First** sample (to maintain chronological continuity).
+      - The **Peak CO** sample (to capture the "worst-case" air quality event).
+  3. **Reconstitution:** Merges, deduplicates, and re-sorts these samples to provide 
+     a "High-Fidelity Envelope" of the 30-day run.
+
+  ## Parameters
+    - `samples`: A list of `%GasSensor.Sample{}` structs containing 7 environmental metrics.
+    - `max_points`: The target number of points to display (usually matched to UI width).
+
+  ## Returns
+    - A list of samples where `length(samples) <= max_points * 2`.
+  """
+  defp downsample(samples, max_points) when length(samples) <= max_points, do: samples
 
   defp downsample(samples, max_points) do
-    # Simple min-max downsampling for performance
-    # More advanced: LTTB (Largest Triangle Three Buckets) algorithm
-
+    # Calculate the 'temporal width' of a single pixel-cluster
     bucket_size = max(1, div(length(samples), max_points))
 
     samples
     |> Enum.chunk_every(bucket_size, bucket_size, :discard)
     |> Enum.map(fn bucket ->
-      # For each bucket, keep min and max for visual accuracy
-      ppms = Enum.map(bucket, & &1.ppm)
-      min_ppm = Enum.min(ppms)
-      max_ppm = Enum.max(ppms)
+      # We anchor the window with the first point and the most dangerous point (Peak CO)
+      first = List.first(bucket)
+      peak_co = Enum.max_by(bucket, & &1.co_ppm)
 
-      # Find timestamps for min and max
-      min_sample = Enum.find(bucket, &(&1.ppm == min_ppm))
-      max_sample = Enum.find(bucket, &(&1.ppm == max_ppm))
-
-      # Return 2 points per bucket (min and max)
-      # This preserves the visual envelope of the data
-      [min_sample, max_sample]
+      [first, peak_co]
     end)
     |> List.flatten()
+    |> Enum.uniq_by(& &1.timestamp) 
     |> Enum.sort_by(& &1.timestamp, DateTime)
     |> Enum.take(max_points)
   end
 
+
+  @doc """
+  Calculates the statistical median from a list of numeric sensor readings. 
+  It not used here for the time being
+
+  ## Why the Median?
+  - **Noise Reduction:** Sensors can produce "spikes" due to transient electrical interference or power fluctuations. 
+  - **Outlier Immunity:** Unlike the Mean (average), the Median is not skewed by 
+    single erroneous readings. If 4 readings are ~5000 and 1 is 0 (error), the 
+    median correctly stays at ~5000.
+
+  ## Implementation Details
+  - **Sorting:** The list is sorted in ascending order.
+  - **Odd Count:** Returns the exact middle element.
+  - **Even Count:** Returns the arithmetic mean of the two central elements.
+
+  ## Parameters
+    - `values`: A List of numbers (Integer or Float).
+
+  ## Returns
+    - A single numeric value (Integer or Float) representing the median.
+  """
   defp calculate_median(values) do
     sorted = Enum.sort(values)
     count = length(sorted)
 
     if rem(count, 2) == 1 do
+      # Odd: Pick the middle
       Enum.at(sorted, div(count, 2))
     else
+      # Even: Average the two middle points
       mid = div(count, 2)
       (Enum.at(sorted, mid - 1) + Enum.at(sorted, mid)) / 2
     end
   end
+
 end

@@ -30,41 +30,67 @@ defmodule GasSensor.Application do
 
   ```
   ┌─────────────────────────────────────────┐
-  │ GasSensor.Sensor (GenServer)           │
+  │ GasSensor.Sensor (GenServer)            │
   │  ├── I2C bus reference                  │
   │  ├── Current PPM state                  │
-  │  └── 7-sample window (~1KB)            │
+  │  └── 11-sample window (~1KB)            │
   ├─────────────────────────────────────────┤
-  │ GasSensor.ReadingAgent (Agent)         │
+  │ GasSensor.ReadingAgent (Agent)          │
   │  └── Current reading map (~200 bytes)   │
   ├─────────────────────────────────────────┤
-  │ GasSensor.History (ETS ordered_set)      │
+  │ GasSensor.History (ETS ordered_set)     │
   │  └── 17,280 samples × 52 bytes = ~900KB │
   └─────────────────────────────────────────┘
   ```
   """
   use Application
 
+  # grab the real sensor from the config
+  # if we compile on host, use the fake sensor 
+  @bme680 Application.compile_env(:gas_sensor, :bme680_module)
+
   @impl true
   def start(_type, _args) do
+
+    # Provision for real vs fake bme680 sensor
+    bme680_sensor =
+      if @bme680 == BMP280 do
+        # remember from documentation:
+        # https://github.com/elixir-sensors/bmp280
+        # {:ok, bmp} = BMP280.start_link(bus_name: "i2c-1", bus_address: 0x77)
+        # start real genserver embedded in the library of bmp280:
+        # This is a child spec — 
+        # that is, it is an instruction you give to the supervisor for how to start a process.
+        # It's a tuple with two parts:
+        { 
+          BMP280, # the module to start 
+          bus_name: "i2c-1", bus_address: 0x77, name: :bme680 # the options you pass to the module 
+        }
+       # and below when you call Supervisor.start_link(children, opts)
+       # you start the genserver for this module
+      else
+        @bme680 # grab the fake stubbed sensor : GasSensor.BME680.Stub
+      end
+
     # Initialize timestamp module (records boot time, sets up offline tracking)
     GasSensor.Timestamp.init()
 
     # Get I2C bus from application configuration (defaults to "i2c-1")
+    # If you are on dev mode on host, i2c_bus will be i2c_bus_stub
     i2c_bus = Application.get_env(:gas_sensor, :i2c_bus, "i2c-1")
 
     children = [
+
       #1. Agent starts first. Always available for web requests 
-      GasSensor.ReadingAgent
+      GasSensor.ReadingAgent,
 
-      #2. BMP 280 Genserver. Starts its own I2C connection and provides data 
- 
-      # Layer 2: History - 24-hour ETS-based circular buffer
-      # No dependencies, ~900KB for 17,280 samples
-      # Provides time-series data for graphing and analysis
-      GasSensor.History,
+      #2. Start BMP280 Genserver
+      #bme680_sensor,
+     
+      #3. Start History Genserver 
+      #GasSensor.History,
 
-      # Layer 3: Sensor - only process that touches I2C
+      #4. Sensor - only process that touches I2C
       # Depends on ReadingAgent and History (must start after)
       # Pass I2C bus configuration from app config
       # {GasSensor.Sensor, [i2c_bus: i2c_bus]}

@@ -34,17 +34,16 @@ defmodule GasSensor.ReadingAgent do
   4. **Better Concurrency**: Multiple web requests can read simultaneously without GenServer bottlenecks
   """
 
-  # window is used to calculate the median from the samples
   # time_reliable is true when NTP has synced (RTC-less systems)
 
   @default_reading %{
     co_ppm:               0.0,
-    temperature:          0.0,
+    temperature_c:        0.0,
     humidity_rh:          0.0,
     dew_point_c:          0.0,
     gas_resistance_ohms:  0.0,
+    pressure_pa:	  0.0, 
     cpu_temperature:      0.0,
-    window:               [],
     timestamp:            nil,  
     time_reliable:	  false,
     status:               :not_started,
@@ -86,7 +85,7 @@ defmodule GasSensor.ReadingAgent do
       45.32
   """
   def get_ppm do
-    Agent.get(@agent_name, & &1.ppm)
+    Agent.get(@agent_name, & &1.co_ppm)
   end
 
   @doc """
