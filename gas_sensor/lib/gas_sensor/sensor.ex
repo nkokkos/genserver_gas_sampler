@@ -2,7 +2,7 @@ defmodule GasSensor.Sensor do
   @moduledoc """
   GenServer for a Gas Sensor via ADS1115 ADC.
 
-  Samples 7 times evenly spread over 5 seconds.
+  Samples 11 times evenly spread over 10 seconds.
   Applies median filter and saves result to state.
 
   ## Architecture Note
@@ -36,31 +36,16 @@ defmodule GasSensor.Sensor do
   # ADS1115 I2C address
   @ads1115_addr 0x48
 
-  # ADS1115 registers
-  @reg_conversion 0x00
-  @reg_config 0x01
+  # BME680 Breakoutboard address
+  @bme680_addr 0x76
 
-  # Config register bytes:
-  # Byte 1: 11000101 = 0xC5
-  #   OS   = 1   (start single conversion)
-  #   MUX  = 000 (AIN0 - AIN1 differential)
-  #   PGA  = 010 (±2.048V)
-  #   MODE = 1   (single shot)
-  # Byte 2: 10000011 = 0x83
-  #   DR   = 000 (8 SPS)
-  #   COMP = disabled
-  @config_msb 0xC5
-  @config_lsb 0x83
-
-  # Timing configuration
-  # Using default 8 SPS = 125ms conversion time
-  @conversion_ms 130
-  @total_window 5_000
-  @num_samples 7
+  @conversion_ms 140
+  @total_window 10_000
+  @num_samples 11
   @sample_interval div(@total_window, @num_samples)
 
   # Sensor calibration - UPDATE THESE VALUES based on your sensor!
-  @sensitivity_na_per_ppm 1.523
+  @sensitivity_na_per_ppm 1.525
   @r3_ohms 1_200_000
   @divider_factor ( 9.95 / (9.95 + 9.95) ) 
 
@@ -148,10 +133,6 @@ defmodule GasSensor.Sensor do
   @impl true
   def handle_info(:collect_sample, state) do
 
-     # always get readings from the bme sensor before moving to something else
-     # use the elevation to pass as a parameter the elevation of your place:
-     # https://www.freemaptools.com/elevation-finder.htm 
-     # examples:
      # iex> {:ok, bmp} = BMP280.start_link(bus_name: "i2c-1", bus_address: 0x77)
      # 3{:ok, #PID<0.29929.0>}
      # iex> BMP280.measure(bmp)

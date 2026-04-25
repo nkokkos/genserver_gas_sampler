@@ -1,0 +1,73 @@
+# VM Args for Raspberry Pi Zero W
+# Optimized for single-core, 512MB RAM
+# This file is evaluated at runtime
+
+# Scheduler settings for single-core Pi Zero
++S 1              # Use only 1 scheduler thread (Pi Zero is single-core)
++A 4              # Reduce async I/O threads from default 10 to 4
++SDio 1           # 1 dirty I/O scheduler (reduced from default)
+
+# Disable scheduler busy waiting to save CPU and power
++sbwt none
++swt very_low     # Very low scheduler wake cleanup threshold
+
+# Memory allocator settings for embedded (reduce fragmentation)
++MBas aobf        # Binary allocator strategy: address order best fit
++MBlmbcs 512     # Large block multiblock carrier size
++MBlmcs 256      # Large block maximum carrier size
++MBsmcs 256      # Small block maximum carrier size
+
+# ETS allocator
++MEas aobf
++MElmbcs 512
++MElmcs 256
++MEsmcs 256
+
+# Heap allocator
++MHlmbcs 512
++MHlmcs 256
++MHsmcs 256
+
+# String/binary allocator
++MSlmbcs 512
++MSlmcs 256
++MSsmcs 256
+
+# Thread progress settings
++SPg true         # Thread-global progress
+
+# Memory limits (in words, 8 bytes each on 64-bit)
+# Max heap ~96MB, leaving room for OS and NIFs
++hmw 12582912     # Max heap: 12M words = ~96MB
++hms 4194304      # Min heap: 4M words = ~32MB
++hmbs 1048576     # Heap block: 1M words = ~8MB
+
+# Stack sizes (in words)
++sss 64           # Small stack: 64 words
++ss 256           # Normal stack: 256 words
+
+# Character encoding
++pc unicode       # Default to Unicode
+
+# Time settings
++c true           # Enable time correction
++C no_time_warp   # No time warp mode
+
+# Distribution (disabled for embedded)
+-kernel inet_dist_listen_min 4370 inet_dist_listen_max 4370
+
+# Heartbeat (optional, enables auto-restart if VM hangs)
+-heart -env HEART_BEAT_TIMEOUT 60
+
+# Cookie for distributed Erlang (Livebook access)
+# This cookie must match the one used by Livebook to connect
+-setcookie gassensor_demo_cookie_2024
+
+# Node name for distribution (required for Livebook/Observer access)
+# Using host name 'nerves.local' for easy discovery
+-name sampler@nerves.local
+
+# EPMD (Erlang Port Mapper Daemon) settings
+# Bind to all interfaces so Livebook can connect over network
+-kernel inet_dist_listen_min 4370 inet_dist_listen_max 4370
+-kernel inet_dist_use_interface {0,0,0,0}

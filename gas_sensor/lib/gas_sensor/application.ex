@@ -62,9 +62,17 @@ defmodule GasSensor.Application do
         # This is a child spec — 
         # that is, it is an instruction you give to the supervisor for how to start a process.
         # It's a tuple with two parts:
+        # So, in any part of the codebase you can access the sensor like this:
+        # {:ok, data} = BMP280.measure(:bme680)
+        # Access:
+        # data.temperature_c      # Temperature in Celsius
+        # data.pressure_pa        # Pressure in Pascals
+        # data.humidity_rh        # Humidity (if BME280/BME680)
         { 
           BMP280, # the module to start 
-          bus_name: "i2c-1", bus_address: 0x77, name: :bme680 # the options you pass to the module 
+          bus_name: "i2c-1", 
+          bus_address: 0x77, 
+          name: :bme680 # the options you pass to the module 
         }
        # and below when you call Supervisor.start_link(children, opts)
        # you start the genserver for this module

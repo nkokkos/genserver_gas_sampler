@@ -1,0 +1,153 @@
+import Config
+
+config :sampler,
+  indicators: %{
+    default: %{
+      green: "ACT"
+    }
+  }
+
+# Raspberry Pi Zero W specific configuration
+# Optimized for 512MB RAM
+
+# Configure networking (WiFi only on Pi Zero)
+config :vintage_net,
+  regulatory_domain: "US",
+  config: [
+    #{"wlan0", %{type: VintageNetWiFi}}
+    {"usb0", %{type: VintageNetDirect}}
+  ]
+
+# Configure gas_sensor I2C settings
+config :gas_sensor,
+  i2c_bus: "i2c-1",
+  # Firmware build date - used as base for provisional timestamps
+  # when offline (no WiFi/NTP). Update this when rebuilding firmware.
+  firmware_build_date: ~U[2024-03-30 00:00:00Z]
+
+# Configure NTP servers for time synchronization
+# These are used by nerves_time to sync system clock
+# You can specify custom servers here (e.g., your own NTP server)
+config :nerves_time, :servers, [
+  # Default NTP pool servers (recommended for most users)
+  "0.pool.ntp.org",
+  "1.pool.ntp.org",
+  "2.pool.ntp.org",
+  "3.pool.ntp.org"
+
+  # Regional servers (uncomment for better performance in your region)
+  # "0.us.pool.ntp.org",  # North America
+  # "0.europe.pool.ntp.org",  # Europe
+  # "0.asia.pool.ntp.org",  # Asia
+
+  # Custom/internal NTP servers (add your own)
+  # "ntp.mycompany.local",  # Internal company server
+  # "192.168.1.1",          # Router with NTP
+  # "10.0.0.1",             # Local network NTP
+]
+
+# Optional: Configure NTP sync interval (default is every 11 minutes)
+# config :nerves_time, :sync_interval, 600  # seconds
+
+# Configure gas_sensor_web for production on device
+#config :gas_sensor_web, GasSensorWeb.Endpoint,
+#  url: [host: "0.0.0.0", port: 80],
+#  server: true,
+#  check_origin: false
+
+# Shoehorn configuration
+# use shoehorn to handle otp application failures and load
+# primary application components
+# https://github.com/nerves-project/shoehorn
+config :shoehorn,
+  init: [:nerves_runtime, :nerves_pack],
+  app: Mix.Project.config()[:app]
+
+# Nerves runtime configuration
+# config :nerves_runtime, :kernel, use_system_registry: true
+
+# Configuration for logger 
+config :logger, RingLogger, persist_path: "/data/log
+
+
+# Use shoehorn to start the main application. See the shoehorn
+# library documentation for more control in ordering how OTP
+# applications are started and handling failures.
+
+# Erlinit can be configured without a rootfs_overlay. See
+# https://github.com/nerves-project/erlinit/ for more information on
+# configuring erlinit.
+
+config :nerves, :erlinit, update_clock: true
+
+# Configure the device for SSH IEx prompt access and firmware updates
+#
+# * See https://hexdocs.pm/nerves_ssh/readme.html for general SSH configuration
+# * See https://hexdocs.pm/ssh_subsystem_fwup/readme.html for firmware updates
+
+keys =
+  [
+    Path.join([System.user_home!(), ".ssh", "id_rsa.pub"]),
+    Path.join([System.user_home!(), ".ssh", "id_ecdsa.pub"]),
+    Path.join([System.user_home!(), ".ssh", "id_ed25519.pub"])
+  ]
+  |> Enum.filter(&File.exists?/1)
+
+if keys == [],
+  do:
+    Mix.raise("""
+    No SSH public keys found in ~/.ssh. An ssh authorized key is needed to
+    log into the Nerves device and update firmware on it using ssh.
+    See your project's config.exs for this error message.
+    """)
+
+config :nerves_ssh,
+  authorized_keys: Enum.map(keys, &File.read!/1)
+
+# Configure the network using vintage_net
+# See https://github.com/nerves-networking/vintage_net for more information
+
+
+config :mdns_lite,
+  # The `hosts` key specifies what hostnames mdns_lite advertises.  `:hostname`
+  # advertises the device's hostname.local. For the official Nerves systems, this
+  # is "nerves-<4 digit serial#>.local".  The `"nerves"` host causes mdns_lite
+  # to advertise "nerves.local" for convenience. If more than one Nerves device
+  # is on the network, it is recommended to delete "nerves" from the list
+  # because otherwise any of the devices may respond to nerves.local leading to
+  # unpredictable behavior.
+
+  hosts: [:hostname, "nerves"],
+  ttl: 120,
+
+  # Advertise the following services over mDNS.
+  services: [
+    %{
+      protocol: "ssh",
+      transport: "tcp",
+      port: 22
+    },
+    %{
+      protocol: "sftp-ssh",
+      transport: "tcp",
+      port: 22
+    },
+    %{
+      protocol: "epmd",
+      transport: "tcp",
+      port: 4369
+    }
+  ]
+
+# Import target specific config. This must remain at the bottom
+# of this file so it overrides the configuration defined above.
+# Uncomment to use target specific configurations
+# import_config "#{Mix.target()}.exs"
+
+
+# Logger configuration for embedded (reduce memory usage)
+#config :logger,
+#  level: :warning,
+#  backends: [RingLogger],
+#  ring_size: 1024,
+#  flush: true
