@@ -111,9 +111,9 @@ if [ "$NUCLEAR" = true ]; then
   echo ""
   
   # Calculate total size to be freed
-  GAS_SENSOR_SIZE=$(calculate_cleanup "gas_sensor")
-  GAS_SENSOR_WEB_SIZE=$(calculate_cleanup "gas_sensor_web")
-  SAMPLER_SIZE=$(calculate_cleanup "sampler")
+  GAS_SENSOR_SIZE=$(calculate_cleanup "core")
+  GAS_SENSOR_WEB_SIZE=$(calculate_cleanup "ui")
+  SAMPLER_SIZE=$(calculate_cleanup "firmware")
   TOTAL_SIZE=$((GAS_SENSOR_SIZE + GAS_SENSOR_WEB_SIZE + SAMPLER_SIZE))
   
   echo "This will delete the following directories:"

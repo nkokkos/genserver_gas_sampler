@@ -17,11 +17,11 @@ Application.start(:nerves_bootstrap)
 
 # It stores the current build target into the application's environment
 # For example, you set target to be rpi0 or something else
-config :sampler, target: Mix.target()
+config :firmware, target: Mix.target()
 
 # Customize non-Elixir parts of the firmware. See
 # https://hexdocs.pm/nerves/advanced-configuration.html for details.
-# It points to a folder in the current project (sampler/rootfs_overlay)
+# It points to a folder in the current project (firmware/rootfs_overlay)
 # What it does: Anything we put in that folder, like a custom iex.exs or 
 # some other script, will be copied directly to the rasberry pi's read 
 # only system. Basically, this is a way to "inject" files to the Linux OS
@@ -42,14 +42,14 @@ config :nerves, source_date_epoch: "1577975236"
 # by typing: RingLogger.new
 config :logger, backends: [RingLogger]
 
-
 # use shoehorn to handle otp application failures and load
 # primary application components
 # https://github.com/nerves-project/shoehorn
 
+# shoehorn is configured in target.exs:
 #config :shoehorn,
 #  init: [:nerves_runtime, :nerves_pack],
-#  app:  :sampler
+#  app:  :firmware
 
 # Picks ups configuration based on the host
 # What it does: host.exs contains settings for our host(laptop). For 

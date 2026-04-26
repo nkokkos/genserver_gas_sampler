@@ -1,7 +1,8 @@
-#Configuration for the Raspberry Pi Zero (target rpi0)
+# Configuration for the Raspberry Pi Zero (target rpi0)
+
 import Config
 
-config :sampler,
+config :firmware,
   indicators: %{
     default: %{
       green: "ACT"

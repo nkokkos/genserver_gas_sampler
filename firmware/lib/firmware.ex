@@ -1,9 +1,9 @@
-defmodule Sampler do
+defmodule Firmware do
   @moduledoc """
   Sampler Nerves Firmware
 
   This is the firmware application that runs on embedded hardware.
-  It depends on the GasSensor OTP application for gas sensing functionality.
+  It depends on the Core OTP application for gas sensing functionality.
 
   ## Targets
 

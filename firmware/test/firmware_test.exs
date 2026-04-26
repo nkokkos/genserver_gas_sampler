@@ -1,6 +1,6 @@
-defmodule SamplerTest do
+defmodule FirmwareTest do
   use ExUnit.Case
-  doctest Sampler
+  doctest Firmware
 
   test "greets the world" do
     assert true

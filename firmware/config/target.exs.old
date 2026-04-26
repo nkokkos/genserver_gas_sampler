@@ -107,7 +107,6 @@ config :nerves_ssh,
 # Configure the network using vintage_net
 # See https://github.com/nerves-networking/vintage_net for more information
 
-
 config :mdns_lite,
   # The `hosts` key specifies what hostnames mdns_lite advertises.  `:hostname`
   # advertises the device's hostname.local. For the official Nerves systems, this
