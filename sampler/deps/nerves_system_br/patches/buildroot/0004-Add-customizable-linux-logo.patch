@@ -1,0 +1,128 @@
+From 84654b13f2d61acf0915fad846e21ff3fff5bb5c Mon Sep 17 00:00:00 2001
+From: Angelo Compagnucci <angelo.compagnucci@gmail.com>
+Date: Wed, 3 Feb 2016 00:05:42 +0100
+Subject: [PATCH] Add customizable linux logo
+
+This patch adds a custom linux logo to the generated kernel image.
+
+[FH - skip conversion if already converted]
+
+Signed-off-by: Angelo Compagnucci <angelo.compagnucci@gmail.com>
+---
+ linux/Config.ext.in              |  9 +++++++++
+ linux/linux-ext-customlogo.mk    | 11 +++++++++++
+ package/Config.in                |  3 +++
+ package/customlogo/Config.in     | 17 +++++++++++++++++
+ package/customlogo/customlogo.mk | 25 +++++++++++++++++++++++++
+ 5 files changed, 65 insertions(+)
+ create mode 100644 linux/linux-ext-customlogo.mk
+ create mode 100644 package/customlogo/Config.in
+ create mode 100644 package/customlogo/customlogo.mk
+
+diff --git a/linux/Config.ext.in b/linux/Config.ext.in
+index 3b72d3cf60..d1f83b2bd5 100644
+--- a/linux/Config.ext.in
++++ b/linux/Config.ext.in
+@@ -1,5 +1,14 @@
+ menu "Linux Kernel Extensions"
+ 
++#-------------------------------------------------------------------------------
++# Custom logo
++config BR2_LINUX_KERNEL_EXT_CUSTOMLOGO
++	select BR2_PACKAGE_CUSTOMLOGO
++	bool "Custom logo"
++	help
++	  change linux boot logo with your own graphics.
++	  Can be used as an early bootsplash.
++
+ #-------------------------------------------------------------------------------
+ # Xenomai
+ config BR2_LINUX_KERNEL_EXT_XENOMAI
+diff --git a/linux/linux-ext-customlogo.mk b/linux/linux-ext-customlogo.mk
+new file mode 100644
+index 0000000000..ed9cbc1caf
+--- /dev/null
++++ b/linux/linux-ext-customlogo.mk
+@@ -0,0 +1,11 @@
++################################################################################
++#
++# Custom logo
++#
++################################################################################
++
++LINUX_EXTENSIONS += customlogo
++
++define CUSTOMLOGO_PREPARE_KERNEL
++	cp $(CUSTOMLOGO_DIR)/logo_linux_*.p?m $(LINUX_DIR)/drivers/video/logo
++endef
+diff --git a/package/Config.in b/package/Config.in
+index 83414b3e0b..16a79f8db2 100644
+--- a/package/Config.in
++++ b/package/Config.in
+@@ -276,6 +276,9 @@ comment "Sounds"
+ 	source "package/sound-theme-borealis/Config.in"
+ 	source "package/sound-theme-freedesktop/Config.in"
+ 
++comment "Themes"
++	source "package/customlogo/Config.in"
++
+ endmenu
+ 
+ menu "Games"
+diff --git a/package/customlogo/Config.in b/package/customlogo/Config.in
+new file mode 100644
+index 0000000000..3044b14420
+--- /dev/null
++++ b/package/customlogo/Config.in
+@@ -0,0 +1,17 @@
++config BR2_PACKAGE_CUSTOMLOGO
++	bool "Custom logo"
++	help
++	  Change linux boot logo with your own graphics.
++	  Can be used as an early bootsplash.
++
++	  Requires a pre-installed imagemagick on the host system if
++	  the logo is not in the clut224.ppm format.
++
++if BR2_PACKAGE_CUSTOMLOGO
++
++config BR2_PACKAGE_CUSTOMLOGO_PATH
++	string "image file path"
++	help
++	  This image will be used as custom logo.
++
++endif
+diff --git a/package/customlogo/customlogo.mk b/package/customlogo/customlogo.mk
+new file mode 100644
+index 0000000000..96b8745fea
+--- /dev/null
++++ b/package/customlogo/customlogo.mk
+@@ -0,0 +1,25 @@
++################################################################################
++#
++# customlogo
++#
++################################################################################
++
++CUSTOMLOGO_SOURCE =
++
++ifneq ($(findstring _clut224.ppm,$(BR2_PACKAGE_CUSTOMLOGO_PATH)),)
++define CUSTOMLOGO_BUILD_CMDS
++	cp $(BR2_PACKAGE_CUSTOMLOGO_PATH) $(@D)/logo_linux_clut224.ppm
++endef
++else ifneq ($(findstring .pbm,$(BR2_PACKAGE_CUSTOMLOGO_PATH)),)
++define CUSTOMLOGO_BUILD_CMDS
++	cp $(BR2_PACKAGE_CUSTOMLOGO_PATH) $(@D)/logo_linux_mono.pbm
++endef
++else
++define CUSTOMLOGO_BUILD_CMDS
++	convert $(BR2_PACKAGE_CUSTOMLOGO_PATH) \
++		-dither None -colors 224 -compress none \
++		$(@D)/logo_linux_clut224.ppm
++endef
++endif
++
++$(eval $(generic-package))
+-- 
+2.43.0
+

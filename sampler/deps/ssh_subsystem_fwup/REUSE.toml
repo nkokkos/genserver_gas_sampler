@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: None
+# SPDX-License-Identifier: CC0-1.0
+version = 1
+
+[[annotations]]
+path = [
+ "NOTICE",
+ "mix.lock"
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "None"
+SPDX-License-Identifier = "CC0-1.0"
+
+[[annotations]]
+path = [
+ "test/fixtures/ssh_host_rsa_key",
+ "test/fixtures/ssh_host_rsa_key.pub"
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "None"
+SPDX-License-Identifier = "CC0-1.0"

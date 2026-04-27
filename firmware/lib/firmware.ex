@@ -1,9 +1,9 @@
 defmodule Firmware do
   @moduledoc """
-  Sampler Nerves Firmware
+   Nerves Firmware App called "Firmware"
 
   This is the firmware application that runs on embedded hardware.
-  It depends on the Core OTP application for gas sensing functionality.
+  It depends on the Core OTP application for gas sensing functionality
 
   ## Targets
 

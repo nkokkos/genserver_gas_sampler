@@ -1,0 +1,84 @@
+<!--
+  SPDX-FileCopyrightText: None
+  SPDX-License-Identifier: CC0-1.0
+-->
+
+# Changelog
+
+## v0.6.7
+
+* Improvements
+  * Add `--password` to `mix upload` so that it's possible to automatically fill
+    in ssh passwords. This is useful for working with firmware like
+    circuits_quickstart and nerves_livebook images where passwords are for
+    convenience rather than security.
+
+## v0.6.6
+
+* Improvements
+  * Delay notification of exit by 500 ms to allow time for gracefuly closing the
+    ssh connection. This reduces or hopefully prevents the client reporting an
+    error when the upload was successful.
+
+## v0.6.5
+
+* Improvements
+  * Print firmware nickname if available when running `mix upload`
+
+## v0.6.4
+
+* Improvements
+  * Use `interactive_cmd` in `mix upload` so that the call to `ssh` can ask for
+    passwords and so that CTRL+C works.
+  * Add `--port` option to `mix upload` to support non-standard `ssh` ports
+
+## v0.6.3
+
+This release adds [REUSE compliance](https://reuse.software/) to improve
+copyright and licensing accuracy for compliance tools.
+
+* Improvements
+  * Fixed a minor Elixir 1.19 warning
+  * Removed support for Elixir 1.13 and earlier since they're no longer
+    regularly tested.
+
+## v0.6.2
+
+* Improvements
+  * Fix `mix upload` so that its invocation of `ssh` no longer overrides
+    `LD_LIBRARY_PATH`. (@ringlej)
+  * Fix/clean up some typespecs
+
+## v0.6.1
+
+* Improvements
+  * `mix upload` now attempts to display the UUID of the firmware as well
+
+## v0.6.0
+
+* New features
+  * Added a `:precheck_callback` option to support updating firmware update
+    options at runtime and to stop updates from happening at critical times
+  * Added a `:fwup_env` option for passing OS environment variables to fwup
+  * Support setting default system-wide options in the application config in
+    addition to the subsystem spec. The subsystem spec takes precedence.
+
+## v0.5.2
+
+* Improvements
+  * Improve instructions for how to update from `nerves_firmware_ssh`
+
+## v0.5.1
+
+This releases adds a check for old `upload.sh` scripts to warn users that
+they'll need to update it.
+
+## v0.5.0
+
+Initial release.
+
+This factors out the SSH subsystem from
+[`nerves_firmware_ssh`](https://github.com/nerves-project/nerves_firmware_ssh)
+and removes all ssh server code. The user of this library now has to start a
+server themselves. This makes it possible to run the firmware update on port 22
+and removes the constraint of needing to hard code authorized ssh public keys.
