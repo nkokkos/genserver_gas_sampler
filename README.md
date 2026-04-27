@@ -1,6 +1,9 @@
-# Gas Sensor Poncho Project
+# TGS5042 Gas Sensor Poncho Project
 
-This is a [poncho project](https://embedded-elixir.com/post/2017-05-19-poncho-projects/) for Nerves that separates firmware from business logic, targeting **Raspberry Pi Zero W**.
+# This is a project in progress
+
+This is a [poncho project](https://embedded-elixir.com/post/2017-05-19-poncho-projects/) 
+for Nerves that separates firmware from business logic, targeting **Raspberry Pi Zero W**.
 
 ## Target Platform
 
@@ -11,11 +14,11 @@ This is a [poncho project](https://embedded-elixir.com/post/2017-05-19-poncho-pr
 ```
 genserver_gas_sampler/
 ├── README.md                    # This file
-├── sampler/                     # Nerves firmware application
+├── firmware/                    # Nerves firmware application
 │   ├── lib/
-│   │   ├── sampler.ex
-│   │   └── sampler/
-│   │       └── application.ex   # Supervisor that starts GasSensor + Web
+│   │   ├── firmware.ex
+│   │   └── firmware/
+│   │       └── application.ex  # Supervisor that starts Core + UI
 │   ├── config/
 │   │   ├── config.exs          # Main configuration
 │   │   ├── host.exs            # Host development config
@@ -25,20 +28,20 @@ genserver_gas_sampler/
 │   │       └── iex.exs         # IEx startup configuration
 │   ├── mix.exs                 # Nerves dependencies
 │   └── test/
-├── gas_sensor/                  # OTP business logic (reusable library)
+├── core/                  	# OTP business logic (reusable library)
 │   ├── lib/
-│   │   ├── gas_sensor.ex
-│   │   └── gas_sensor/
+│   │   ├── core.ex
+│   │   └── core/
 │   │       ├── application.ex  # OTP Application
 │   │       └── sensor.ex       # GenServer for ADC reading
 │   ├── config/
 │   ├── mix.exs
 │   └── test/
-└── gas_sensor_web/              # Phoenix web interface
+└── ui/              # Phoenix web interface
     ├── lib/
-    │   ├── gas_sensor_web/
+    │   ├── ui/
     │   │   └── application.ex  # Phoenix OTP Application
-    │   └── gas_sensor_web_web/
+    │   └── ui/
     │       ├── endpoint.ex     # HTTP endpoint
     │       ├── router.ex       # Routes
     │       ├── live/           # LiveView modules
@@ -54,7 +57,7 @@ genserver_gas_sampler/
 ### 1. Build and test the gas_sensor library
 
 ```bash
-cd gas_sensor
+cd core
 mix deps.get
 mix test
 ```
@@ -62,7 +65,7 @@ mix test
 ### 2. Build firmware for Raspberry Pi Zero W
 
 ```bash
-cd sampler
+cd core
 export MIX_TARGET=rpi0
 mix deps.get
 mix firmware
@@ -92,7 +95,7 @@ The web interface updates in real-time using Phoenix LiveView (1-second refresh)
 
 - **Raspberry Pi Zero W** (with wireless)
 - ADS1115 ADC connected via I2C
-- Gas sensor (CO sensor with known sensitivity)
+- TGS 5042 Gas sensor (CO sensor with known sensitivity)
 - Micro USB power supply
 
 ### Wiring
@@ -143,13 +146,13 @@ VintageNet.configure("wlan0", %{
 
 ## Architecture
 
-### gas_sensor OTP Application
+### Core OTP Application
 
 A reusable OTP application that provides:
 
-- **GasSensor.Sensor** - GenServer that:
+- **Core.Sensor** - GenServer that:
   - Communicates with ADS1115 ADC via I2C
-  - Samples 7 times over 5 seconds
+  - Samples 11 times over 10 seconds
   - Applies median filtering
   - Calculates CO concentration in PPM
   - Provides `get_ppm/0` and `get_state/0` APIs
@@ -160,7 +163,7 @@ Key features:
 - Calibrated for specific gas sensor
 - Logging for debugging
 
-### gas_sensor_web Phoenix Application
+### UI Phoenix Application
 
 A lightweight Phoenix web interface that:
 
@@ -184,13 +187,13 @@ Features:
 - Embedded CSS (no external assets needed)
 - Mobile-responsive design
 
-### sampler Nerves Application
+### Firmware Nerves Application
 
 Firmware that:
 - Runs on Raspberry Pi Zero W
 - Configures WiFi networking
-- Starts GasSensor for I2C readings
-- Starts GasSensorWeb for web interface
+- Starts Core OTP app for I2C readings
+- Starts UI Phoenix app for web interface
 - Provides IEx helpers for interactive debugging
 
 ## Calibration
@@ -212,13 +215,13 @@ Connect to your Pi Zero W via serial console or SSH, then:
 
 ```elixir
 # Get current PPM reading
-GasSensor.Sensor.get_ppm()
+Core.Sensor.get_ppm()
 
 # Get full state for debugging
-GasSensor.Sensor.get_state()
+Core.Sensor.get_state()
 
 # Use helper for formatted output
-Sampler.Helpers.gas_info()
+Core.Helpers.gas_info()
 ```
 
 ### Web Interface
