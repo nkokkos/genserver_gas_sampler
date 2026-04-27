@@ -11,34 +11,34 @@ This project uses a **three-layer poncho architecture** with proper separation o
 ## Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Phoenix LiveView                          │
-│                    (Dashboard & Sensor Page)                 │
-│                          │                                   │
-│                          │ reads from                        │
-│                          ▼                                   │
-│              ┌─────────────────────────┐                     │
-│              │   ReadingAgent.get/0    │  ◄── Non-blocking    │
-│              └───────────┬─────────────┘      O(1) reads    │
+┌────────────────────────────────────────────────────────────┐
+│                    Phoenix LiveView                        │
+│                    (Dashboard & Sensor Page)               │
+│                          │                                 │
+│                          │ reads from                      │
+│                          ▼                                 │
+│              ┌─────────────────────────┐                   │
+│              │   ReadingAgent.get/0    │  ◄── Non-blocking │
+│              └───────────┬─────────────┘      O(1) reads   │
 └──────────────────────────┼─────────────────────────────────┘
                            │
                            │ updates after each reading
                            │
 ┌──────────────────────────┼─────────────────────────────────┐
 │              ┌───────────┴─────────────┐                   │
-│              │   ReadingAgent.update/1   │                   │
-│              └───────────┬─────────────┘                    │
-│                          │                                   │
-│                    GasSensor.Sensor                         │
-│                    (GenServer - SINGLE I2C WRITER)          │
-│                          │                                   │
+│              │   ReadingAgent.update/1 │                   │
+│              └───────────┬─────────────┘                   │
+│                          │                                 │
+│                    GasSensor.Sensor                        │
+│                    (GenServer - SINGLE I2C WRITER)         │
+│                          │                                 │
 │                          │ exclusive access                │
-│                          ▼                                   │
+│                          ▼                                 │
 │                    ┌─────────────┐                         │
 │                    │   I2C Bus   │ ◄─── Hardware (ADS1115) │
 │                    │   i2c-1     │                         │
 │                    └─────────────┘                         │
-└─────────────────────────────────────────────────────────────┘
+└────────────────────────────────────────────────────────────┘
 ```
 
 ## Key Design Decisions
@@ -54,7 +54,7 @@ This project uses a **three-layer poncho architecture** with proper separation o
 
 **Data Flow:**
 1. Sensor reads from I2C every 714ms
-2. Sensor calculates median from 7 samples
+2. Sensor calculates median from 11 in series samples
 3. Sensor pushes result to Agent (with timestamp)
 4. Phoenix reads from Agent instantly (no blocking)
 
@@ -65,17 +65,17 @@ The supervision trees are designed to ensure proper startup order:
 **gas_sensor supervision tree:**
 ```
 Supervisor (one_for_one)
-├── GasSensor.ReadingAgent (starts first - no deps)
-└── GasSensor.Sensor (starts second - updates Agent)
+├── Core.ReadingAgent (starts first - no deps)
+└── Core.Sensor (starts second - updates Agent)
 ```
 
 **Complete system supervision:**
 ```
 Nerves Firmware
-├── gas_sensor OTP App (auto-starts)
+├── core OTP App (auto-starts)
 │   ├── ReadingAgent
 │   └── Sensor (I2C hardware)
-├── gas_sensor_web OTP App (auto-starts)
+├── ui OTP App (auto-starts)
 │   ├── PubSub
 │   ├── Telemetry
 │   └── Endpoint (HTTP server)
@@ -98,39 +98,6 @@ Configuration is split by environment:
 - **host.exs**: Development/testing (no I2C hardware)
 - **target.exs**: Production Pi Zero W (with I2C and WiFi)
 
-## File Structure
-
-```
-gas_sensor/
-├── lib/
-│   ├── gas_sensor/
-│   │   ├── reading_agent.ex     # NEW: Agent for non-blocking reads
-│   │   ├── sensor.ex            # MODIFIED: Updates Agent after readings
-│   │   └── application.ex       # MODIFIED: Starts Agent before Sensor
-│   └── gas_sensor.ex
-├── config/
-│   ├── host.exs                 # Dev config
-│   └── target.exs               # Pi Zero W I2C config
-└── mix.exs
-
-gas_sensor_web/
-├── lib/gas_sensor_web_web/
-│   ├── live/
-│   │   ├── dashboard_live.ex    # MODIFIED: Reads from Agent
-│   │   └── sensor_live.ex       # MODIFIED: Reads from Agent
-│   └── controllers/
-│       └── sensor_controller.ex # MODIFIED: Reads from Agent
-└── config/
-    └── prod.exs                 # Production web config (port 80)
-
-sampler/
-├── lib/
-│   └── sampler/
-│       └── application.ex       # MODIFIED: Relies on OTP auto-start
-├── config/
-│   └── target.exs               # MODIFIED: App config for both apps
-└── rootfs_overlay/etc/iex.exs   # MODIFIED: Updated helpers
-```
 
 ## API Reference
 
@@ -138,12 +105,12 @@ sampler/
 
 ```elixir
 # Non-blocking reads (use these in web interface)
-GasSensor.ReadingAgent.get_reading()   # Get full reading map
-GasSensor.ReadingAgent.get_ppm()       # Get just PPM value
-GasSensor.ReadingAgent.get_status()    # Get status atom
+Core.ReadingAgent.get_reading()   # Get full reading map
+Core.ReadingAgent.get_ppm()       # Get just PPM value
+Core.ReadingAgent.get_status()    # Get status atom
 
 # Internal use only (called by Sensor)
-GasSensor.ReadingAgent.update(reading_map)  # Push new reading
+Core.ReadingAgent.update(reading_map)  # Push new reading
 ```
 
 ### Reading Map Structure
