@@ -1,4 +1,4 @@
-defmodule GasSensor.HardwareTemp do
+defmodule Core.HardwareTemp do
   @moduledoc """
   Read the temperature from the raspberry's pi cpu
   

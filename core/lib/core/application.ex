@@ -1,11 +1,11 @@
-defmodule GasSensor.Application do
+defmodule Core.Application do
   @moduledoc """
   OTP Application for the Gas Sensor.
 
   This application manages:
-  1. GasSensor.ReadingAgent - Stores latest reading for non-blocking access
-  2. GasSensor.History - 24-hour ETS-based circular buffer for time-series data
-  3. GasSensor.Sensor - GenServer that reads from ADC via I2C
+  1. Core.ReadingAgent - Stores latest reading for non-blocking access
+  2. Core.History - 24-hour ETS-based circular buffer for time-series data
+  3. Core.Sensor - GenServer that reads from ADC via I2C
 
   ## Architecture
 
@@ -90,18 +90,18 @@ defmodule GasSensor.Application do
     children = [
 
       #1. Agent starts first. Always available for web requests 
-      GasSensor.ReadingAgent,
+      Core.ReadingAgent,
 
       #2. Start BMP280 Genserver
       #bme680_sensor,
      
       #3. Start History Genserver 
-      #GasSensor.History,
+      #Core.History,
 
       #4. Sensor - only process that touches I2C
       # Depends on ReadingAgent and History (must start after)
       # Pass I2C bus configuration from app config
-      # {GasSensor.Sensor, [i2c_bus: i2c_bus]}
+      # {Core.Sensor, [i2c_bus: i2c_bus]}
     ]
 
     opts = [strategy: :one_for_one, name: GasSensor.Supervisor]

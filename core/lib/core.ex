@@ -1,6 +1,6 @@
-defmodule GasSensor do
+defmodule Core do
   @moduledoc """
-  GasSensor is an OTP application for reading gas sensor data via ADS1115 ADC.
+  Core is an OTP application for reading gas sensor data via ADS1115 ADC.
 
   ## Features
 
@@ -12,9 +12,9 @@ defmodule GasSensor do
   ## Usage
 
       # Get current reading
-      ppm = GasSensor.Sensor.get_ppm()
+      ppm = Core.Sensor.get_ppm()
       
       # Get full state
-      state = GasSensor.Sensor.get_state()
+      state = Core.Sensor.get_state()
   """
 end

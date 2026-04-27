@@ -1,4 +1,4 @@
-defmodule GasSensor.BME680.Stub do
+defmodule Core.BME680.Stub do
   @moduledoc """
   Provides realistic random stub data for simulating the BME680 breakout board.
   Useful for testing Phoenix/Livebook visualizations and ThingsBoard logic.

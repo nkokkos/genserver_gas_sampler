@@ -1,19 +1,33 @@
-defmodule GasSensor.History do
+defmodule Core.History do
   @moduledoc """
-  ETS-based circular buffer for 7 days sensor history.
+
+  ETS-based circular buffer for a maximum 7 days sensor history.
 
   This module stores all sensor readings in an in-memory ETS table,
   providing O(1) access to historical data for graphing and analysis.
-  Automatic cleanup removes entries older than 24 hours.
+  Automatic cleanup removes entries older than 168 hours.
+
+  The sensor readings include readings from the breakout board BME680 plus
+  carbon monoxide ppm readings from the ads1115 adc module
+
+  Each reading is a tuple defined as follows in the following example
+  co_ppm: 50, 		# this is calculated from adc samples
+  temperature_c: 34, 	# bme680 breakout board
+  humidity_rh: 80,      # bme680 breakout board
+  dew_point_c: 2.629,   # bme680 breakout board
+  gas_resistance_ohms: 5279.474, # bme680 breakout board
+  pressure_pa: 100818.86273677988, # bme680 breaout board
+  cpu_temperature: 35,  # read from the rpi0 cpu 
+  status: :ok or :error # status attached to the reading
 
   ## Architecture
 
   ```
   Sensor GenServer ──→ ETS Table (ordered_set)
                            │
-                           ├── Key: timestamp (DateTime)
-                           ├── Val: reading tuple structure, see below
-                           └── Size: 60,480 samples × 400 bytes ≈ 24,192,000 bytes. Zero W has ~300MB available for BEAM
+                           ├── Key:    timestamp (DateTime)
+                           ├── Values: reading tuple structure, see below
+                           └── Size:   60,480 samples × 400 bytes ≈ 24,192,000 bytes. Zero W has ~300MB available for BEAM
                            │
                            ↓
                     Phoenix LiveView
@@ -28,7 +42,7 @@ defmodule GasSensor.History do
   - 60,480 samples × 400 bytes ≈ 24,192,000 bytes
   - Pi Zero W has ~300MB available for BEAM
 
-  ## Why ETS?
+  ## Why did we use ETS?
 
   1. **O(1) lookups** - Fast access by time range
   2. **Concurrent reads** - Multiple web clients without blocking
@@ -45,21 +59,21 @@ defmodule GasSensor.History do
 
   ## Usage
 
-      # Add a reading (called by Sensor GenServer)
+      # Add a reading (called by Core.Sensor GenServer)
       reading = tuple that contains the timestamp and all the readings
-      GasSensor.History.add_sample(reading, :ok)
+      Core.History.add_sample(reading, :ok)
 
       # Get last 24 hours
-      samples = GasSensor.History.get_last_24h()
+      samples = Core.History.get_last_24h()
    
       # Get last 7 days 
-      samples = GasSensor.History.get_last_7_days()
+      samples = Core.History.get_last_7_days()
    
       # Get downsampled data for graph (400 points max)
-      graph_data = GasSensor.History.get_for_graph(400)
+      graph_data = Core.History.get_for_graph(400)
 
       # Get specific time range
-      range = GasSensor.History.get_range(
+      range = Core.History.get_range(
         DateTime.add(DateTime.utc_now(), -1, :hour),
         DateTime.utc_now()
       )
@@ -86,7 +100,7 @@ defmodule GasSensor.History do
   # Maximum points to render for 24 hours
   @max_samples_for_graph 400
 
-  # Maximum points to render for 7 days = 168 hours
+  # Maximum points to render for 7 days / 168 hours
   @max_samples_for_7_days_graph 300
 
 
@@ -102,7 +116,7 @@ defmodule GasSensor.History do
   @doc """
   Adds a new sample to the history.
 
-  Called by Sensor GenServer after each median-filtered reading.
+  Called by Core.Sensor GenServer after each median-filtered reading.
   Automatically includes timestamp.
 
   ## Examples
@@ -128,8 +142,8 @@ defmodule GasSensor.History do
       status: :error # Add a status flag for easy filtering
     }
  
-      GasSensor.History.add_sample(ok_reading,   :ok)
-      GasSensor.History.add_sample(null_reading, :error)
+      Core.History.add_sample(ok_reading,   :ok)
+      Core.History.add_sample(null_reading, :error)
   """
   def add_sample(%{
     co_ppm: _,
@@ -173,7 +187,7 @@ defmodule GasSensor.History do
 
       # Last hour
       one_hour_ago = DateTime.add(DateTime.utc_now(), -3600)
-      samples = GasSensor.History.get_since(one_hour_ago)
+      samples = Core.History.get_since(one_hour_ago)
   """
   def get_since(%DateTime{} = datetime) do
     # Match spec for a 2-element tuple: {timestamp, reading_map}

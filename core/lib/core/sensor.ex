@@ -1,8 +1,8 @@
-defmodule GasSensor.Sensor do
+defmodule Core.Sensor do
   @moduledoc """
-  GenServer for a Gas Sensor via ADS1115 ADC.
+  GenServer for the TGS5042 Gas Sensor via ADS1115 ADC.
 
-  Samples 11 times evenly spread over 10 seconds.
+  Samples 11 times evenly spread every 10 seconds.
   Applies median filter and saves result to state.
 
   ## Architecture Note
@@ -39,15 +39,15 @@ defmodule GasSensor.Sensor do
   # BME680 Breakoutboard address
   @bme680_addr 0x76
 
-  @conversion_ms 140
-  @total_window 10_000
-  @num_samples 11
+  @conversion_ms 140 	# time to wait for the conversion register to get ready
+  @total_window  10_000  # how often should we sample
+  @num_samples   11
   @sample_interval div(@total_window, @num_samples)
 
-  # Sensor calibration - UPDATE THESE VALUES based on your sensor!
-  @sensitivity_na_per_ppm 1.525
-  @r3_ohms 1_200_000
-  @divider_factor ( 9.95 / (9.95 + 9.95) ) 
+  # TGS_5042 Sensor calibration: 
+  @sensitivity_na_per_ppm 1.525 	# this is the number printed on the module we got.
+  @r3_ohms 		  1_200_000     # feed back resistor connected to the mcp6042 Op amp
+  @divider_factor 	  ( 9.95 / (9.95 + 9.95) ) 
 
   # ── Public API ──────────────────────────────────────────
 
