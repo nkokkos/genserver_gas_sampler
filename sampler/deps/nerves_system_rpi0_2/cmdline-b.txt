@@ -1,2 +1,0 @@
-# See cmdline-a.txt
-root=/dev/mmcblk0p6 rootwait console=serial0,115200 quiet
