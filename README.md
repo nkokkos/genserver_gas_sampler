@@ -54,7 +54,7 @@ genserver_gas_sampler/
 
 ## Quick Start
 
-### 1. Build and test the gas_sensor library
+### 1. Build and test the gas sensor library
 
 ```bash
 cd core
