@@ -64,15 +64,19 @@ defmodule GasSensor.Application do
         # It's a tuple with two parts:
         # So, in any part of the codebase you can access the sensor like this:
         # {:ok, data} = BMP280.measure(bmp)
+        # where bpm is is pid or the name of the process
         # Access:
         # data.temperature_c      # Temperature in Celsius
         # data.pressure_pa        # Pressure in Pascals
         # data.humidity_rh        # Humidity (if BME280/BME680)
+
+        # therefore, to get readings from this sensor:
+        # {:ok, data} = BMP280.measure(:bme680)
         { 
           BMP280, # the module to start 
           bus_name: "i2c-1", 
           bus_address: 0x77, 
-          name: :bme680 # the options you pass to the module 
+          name: :bme680
         }
        # and below when you call Supervisor.start_link(children, opts)
        # you start the genserver for this module
@@ -89,19 +93,19 @@ defmodule GasSensor.Application do
 
     children = [
 
-      #1. Agent starts first. Always available for web requests 
-      Core.ReadingAgent,
+      # 1. Reading Agent starts first. Always available for web requests 
+      GasSensor.ReadingAgent,
 
-      #2. Start BMP280 Genserver
+      # 2. BMP280 Genserver
       bme680_sensor,
      
-      #3. Start History Genserver 
-      #Core.History,
+      # 3. History Genserver 
+      #GasSensor.History,
 
-      #4. Sensor - only process that touches I2C
+      # 4. Sensor - only process that touches I2C
       # Depends on ReadingAgent and History (must start after)
       # Pass I2C bus configuration from app config
-      # {Core.Sensor, [i2c_bus: i2c_bus]}
+      # {GasSensor.Sensor, [i2c_bus: i2c_bus]}
     ]
 
     opts = [strategy: :one_for_one, name: GasSensor.Supervisor]

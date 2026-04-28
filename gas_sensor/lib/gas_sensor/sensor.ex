@@ -36,6 +36,7 @@ defmodule GasSensor.Sensor do
   # ADS1115 I2C address
   @ads1115_addr 0x48
 
+  # We use the breakout board ADS1115 adc for sample the output of the sensor + reference voltage
   # The configuration Register - Full 16 bits from the Datasheet:
   # https://www.ti.com/lit/ds/symlink/ads1115.pdf
   # Table 8-3 Config Register Field Descriptions
@@ -49,7 +50,7 @@ defmodule GasSensor.Sensor do
   @conversion_ms 140 	 # time to wait for the conversion register to get ready
   @total_window  10_000  # how often we should we sample the inputs
   @num_samples   11      # sample 11 times for the median filter
-  @sample_interval div(@total_window, @num_samples)
+  @sample_interval       div(@total_window, @num_samples)
 
   # TGS_5042 Sensor calibration: 
   @sensitivity_na_per_ppm 1.525 	# this is the number printed on the module we got.
@@ -125,10 +126,9 @@ defmodule GasSensor.Sensor do
           # Diagnostics
           a0_mv: 0.0, # A0 reference channel voltage — should stay ~2000mv
           a1_mv: 0.0, # A1 signal channel voltage — raw voltage from the analog circuits where the TGS5042 is attached
-          co_signal_mv: 0.0, # median of co_signal_samples — voltage in millivolts. Tthis voltage is then passed to mv_to_ppm() to produce ppm
+          co_signal_mv: 0.0, # median of co_signal_samples — voltage in millivolts. This voltage is then passed to mv_to_ppm() to produce ppm
           co_signal_samples: [] # 11 raw (A1×2)-A0 values in millivolts. Median of this list = co_signal_mv
         }
-
 
         # Start first sample immediately
         send(self(), :collect_sample)
@@ -163,7 +163,7 @@ defmodule GasSensor.Sensor do
 
   @impl true
   def handle_call(:get_ppm, _from, state) do
-    {:reply, state.ppm, state}
+    {:reply, state.co_ppm, state}
   end
 
   @impl true
@@ -190,6 +190,13 @@ defmodule GasSensor.Sensor do
 
      # BMP280.force_altitude(bmp, 100)
      # :ok
+   
+     # Read the data from the BME280.measure(:bme680)
+     
+     {:ok, bme680_data } =  BME280.measure(:bme680)
+     {:ok, cpu_temp }    =  GasSensor.HardwareTemp.read_cpu_temp()
+     
+     
 
     new_state =
       case read_ads1115(state.i2c) do
@@ -244,6 +251,11 @@ defmodule GasSensor.Sensor do
   end
 
   # ── Private Functions ────────────────────────────────────
+
+  defp publisht_agent(state) do
+  
+
+  end
 
   defp read_ads1115(ref) do
     with :ok <- trigger_conversion(ref),
