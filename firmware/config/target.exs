@@ -30,6 +30,13 @@ config :ui, UiWeb.Endpoint,
 #    { "usb0",  %{  type: VintageNetDirect  } }
 #  ]
 
+# There should be an .env file at the root of this otp app
+# Before mix firmware, do: source .env
+# example:
+#.env (DO NOT COMMIT THIS FILE .env)
+#export NERVES_WIFI_SSID="Your_SSID"
+#export NERVES_WIFI_PASS="Your_Password"
+
 config :vintage_net,
   regulatory_domain: "00",
   config: [
@@ -41,8 +48,8 @@ config :vintage_net,
           networks: [
             %{
               key_mgmt: :wpa_psk,
-              ssid: "Your_Actual_SSID",
-              psk: "Your_Actual_Password",
+              ssid: System.get_env("NERVES_WIFI_SSID"),
+              psk: System.get_env("NERVES_WIFI_PASS")    
             }
           ]
         },

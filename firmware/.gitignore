@@ -33,3 +33,7 @@
 # Ignore generated firmware images
 *.fw
 *.img
+
+# Ignore .env file
+./env
+.env
