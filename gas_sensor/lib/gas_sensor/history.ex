@@ -1,4 +1,4 @@
-defmodule Core.History do
+defmodule GasSensor.History do
   @moduledoc """
 
   ETS-based circular buffer for a maximum 7 days sensor history.

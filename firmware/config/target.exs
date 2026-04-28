@@ -58,13 +58,6 @@ config :vintage_net_wizard,
   dns_name: "tgs5042.config",    # The local URL for the wizard
   captive_portal: false
 
-# Configure core app I2C settings
-# This should copied to the config of the core app
-#config :core, i2c_bus: "i2c-1",
-# Firmware build date - used as base for provisional timestamps
-# when offline (no WiFi/NTP). Update this when rebuilding firmware.
-# firmware_build_date: ~U[2024-03-30 00:00:00Z]
-
 # Configure NTP servers for time synchronization
 # These are used by nerves_time to sync system clock
 # You can specify custom servers here (e.g., your own NTP server)
@@ -94,7 +87,7 @@ config :nerves_time, :sync_interval, 600  # seconds
 # * See https://hexdocs.pm/nerves_ssh/readme.html for general SSH configuration
 # * See https://hexdocs.pm/ssh_subsystem_fwup/readme.html for firmware updates
 
-# Please note!!
+# Read about the ssh keys:
 # 1. Before creating new keys, you should clear the old ones to avoid confusion. 
 # In your terminal, run:
 # rm ~/.ssh/id_rsa ~/.ssh/id_rsa.pub
@@ -109,10 +102,12 @@ config :nerves_time, :sync_interval, 600  # seconds
 # Run this to see your new keys:
 # ls -l ~/.ssh/id_ed25519*
 
-# Also note, that if you are using gadget mode and the nerves device is 
+# 4. Verify ssh connect 
+# If you have problem connecting and if you are using gadget mode and the nerves device is 
 # assigned an ip of 172.31.177.161
 # you need to do this: 
 # ssh-keygen -R 172.31.177.161
+# It might work for the direct wifi connections too.
 
 keys =
   [
@@ -194,6 +189,5 @@ config :logger, RingLogger,
 # Import target specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 # Uncomment to use target specific configurations
-
 import_config "#{Mix.target()}.exs"
 

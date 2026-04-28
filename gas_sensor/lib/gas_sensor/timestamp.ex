@@ -18,7 +18,7 @@ defmodule GasSensor.Timestamp do
   ## WiFi Recovery
 
   When WiFi reconnects and NTP syncs:
-  - System detects time jump (1970 → 2024)
+  - System detects time jump (1970 → current date)
   - New samples get accurate timestamps
   - Old samples remain with provisional timestamps
   - History cleanup may behave unexpectedly (24h window calculated from new time)
@@ -41,7 +41,7 @@ defmodule GasSensor.Timestamp do
   require Logger
 
   # Safe threshold - anything before this year is definitely wrong
-  @minimum_reliable_year 2020
+  @minimum_reliable_year 2025
 
   # Throttle warning logs (don't spam every sample)
   # 30 seconds between warnings
@@ -139,10 +139,10 @@ defmodule GasSensor.Timestamp do
 
   ## Example Offline Sequence
 
-      T+0s:    provisional_timestamp() → ~U[2024-03-15 12:00:00Z] (build date + 0s)
-      T+5s:    provisional_timestamp() → ~U[2024-03-15 12:00:05Z] (build date + 5s)
+      T+0s:    provisional_timestamp() →  ~U[2024-03-15 12:00:00Z] (build date + 0s)
+      T+5s:    provisional_timestamp() →  ~U[2024-03-15 12:00:05Z] (build date + 5s)
       T+60s:   WiFi connects, NTP syncs
-      T+61s:   now_with_reliability() → ~U[2024-03-30 14:26:00Z] (true time)
+      T+61s:   now_with_reliability()  →  ~U[2024-03-30 14:26:00Z] (true time)
   """
   def provisional_timestamp do
     # Base: firmware build date (assumed 2024 for this firmware)

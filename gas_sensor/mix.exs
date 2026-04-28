@@ -1,7 +1,7 @@
 # Run "mix help compile.app" to learn about applications.
 # Run "mix help deps" to learn about dependencies.
 
-defmodule Core.MixProject do
+defmodule GasSensor.MixProject do
   use Mix.Project
 
   def project do
@@ -33,7 +33,6 @@ defmodule Core.MixProject do
       # https://github.com/elixir-sensors/bmp280
       {:bmp280, "~> 0.2" }
       
-
       # add this package https://hex.pm/packages/fostrom
       # {:fostrom, "~> 0.1.0"}
     ]

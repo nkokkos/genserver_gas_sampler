@@ -1,4 +1,4 @@
-defmodule Core.Sensor do
+defmodule GasSensor.Sensor do
   @moduledoc """
   GenServer for the TGS5042 Gas Sensor via ADS1115 ADC.
 
@@ -36,12 +36,19 @@ defmodule Core.Sensor do
   # ADS1115 I2C address
   @ads1115_addr 0x48
 
-  # BME680 Breakoutboard address
-  @bme680_addr 0x76
-
-  @conversion_ms 140 	# time to wait for the conversion register to get ready
-  @total_window  10_000  # how often should we sample
-  @num_samples   11
+  # The configuration Register - Full 16 bits from the Datasheet:
+  # https://www.ti.com/lit/ds/symlink/ads1115.pdf
+  # Table 8-3 Config Register Field Descriptions
+  # Bit: 15  14  13  12  11  10   9   8    7   6   5   4   3   2   1   0
+  #      ├───┼───────────┼──────────┼───┼──────────┼───┼───┼───┼───────┤
+  #      │OS │  MUX[2:0] │ PGA[2:0] │MOD│  DR[2:0] │CM │CP │CL │CQ[1:0]│
+  #      └───┴───────────┴──────────┴───┴──────────┴───┴───┴───┴───────┘
+  #       ←────────── MSB (byte 2) ──────────→←──────── LSB (byte 3) ───→
+  
+  # ASDS1115 configuration: 
+  @conversion_ms 140 	 # time to wait for the conversion register to get ready
+  @total_window  10_000  # how often we should we sample the inputs
+  @num_samples   11      # sample 11 times for the median filter
   @sample_interval div(@total_window, @num_samples)
 
   # TGS_5042 Sensor calibration: 
@@ -88,21 +95,43 @@ defmodule Core.Sensor do
 
   @impl true
   def init(opts) do
+   
+    #reference to the bus
     i2c_bus = Keyword.get(opts, :i2c_bus, "i2c-1")
-
+    
+    #try to open the i2c bus
     case Circuits.I2C.open(i2c_bus) do
       {:ok, ref} ->
         state = %{
+
+          # internal. 
           i2c: ref,
-          ppm: 0.0,
-          window: [],
-          status: :ok,
-          sample_count: 0
+          phase: :calibrating,
+          calibration_samples: [],
+          offset_mv: 0.0,
+
+          # Telemetry
+          co_ppm: 0.0,
+  	  temperature_c: 25.0,
+  	  humidity_rh: 0.0,
+  	  pressure_pa: 0.0,
+  	  dew_point_c: 0.0,
+  	  gas_resistance_ohms: 0.0,
+          cpu_temperature: 0.0,       
+	  adc_status: :no_reading,
+  	  temp_status: :no_reading,
+          timestamp_ms: 0,
+
+          # Diagnostics
+          a0_mv: 0.0, # A0 reference channel voltage — should stay ~2000mv
+          a1_mv: 0.0, # A1 signal channel voltage — raw voltage from the analog circuits where the TGS5042 is attached
+          co_signal_mv: 0.0, # median of co_signal_samples — voltage in millivolts. Tthis voltage is then passed to mv_to_ppm() to produce ppm
+          co_signal_samples: [] # 11 raw (A1×2)-A0 values in millivolts. Median of this list = co_signal_mv
         }
+
 
         # Start first sample immediately
         send(self(), :collect_sample)
-
         Logger.info("GasSensor started on #{i2c_bus}")
         {:ok, state}
 
@@ -110,12 +139,24 @@ defmodule Core.Sensor do
         Logger.error("Failed to open I2C bus #{i2c_bus}: #{inspect(reason)}")
         # Update Agent with error status even if we can't start
         GasSensor.ReadingAgent.update(%{
-          ppm: 0.0,
-          window: [],
-          status: :error,
-          sample_count: 0
-        })
+          # Telemetry
+          co_ppm: nil,
+          temperature_c: nil,
+          humidity_rh: nil,
+          pressure_pa: nil,
+          dew_point_c: nil,
+          gas_resistance_ohms: nil,
+          cpu_temperature: nil,
+          adc_status:  :error_i2c_bus,
+          temp_status: :error_i2c_bus,
+          timestamp_ms: 0,
 
+          # Diagnostics
+          a0_mv: nil, 
+          a1_mv: nil, 
+          co_signal_mv: nil, 
+          co_signal_samples: nil 
+        })
         {:stop, reason}
     end
   end
@@ -208,7 +249,7 @@ defmodule Core.Sensor do
     with :ok <- trigger_conversion(ref),
          :ok <- wait_for_conversion(),
          {:ok, raw} <- read_conversion(ref) do
-      ppm = raw_to_ppm(raw)
+         ppm = raw_to_ppm(raw)
       {:ok, ppm}
     else
       error -> error

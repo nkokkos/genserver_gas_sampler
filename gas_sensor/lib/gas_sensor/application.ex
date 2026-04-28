@@ -1,11 +1,11 @@
-defmodule Core.Application do
+defmodule GasSensor.Application do
   @moduledoc """
   OTP Application for the Gas Sensor.
 
   This application manages:
-  1. Core.ReadingAgent - Stores latest reading for non-blocking access
-  2. Core.History - 24-hour ETS-based circular buffer for time-series data
-  3. Core.Sensor - GenServer that reads from ADC via I2C
+  1. GasSensor.ReadingAgent - Stores latest reading for non-blocking access
+  2. GasSensor.History - 24-hour ETS-based circular buffer for time-series data
+  3. GasSensor.Sensor - GenServer that reads from ADC via I2C
 
   ## Architecture
 
@@ -63,7 +63,7 @@ defmodule Core.Application do
         # that is, it is an instruction you give to the supervisor for how to start a process.
         # It's a tuple with two parts:
         # So, in any part of the codebase you can access the sensor like this:
-        # {:ok, data} = BMP280.measure(:bme680)
+        # {:ok, data} = BMP280.measure(bmp)
         # Access:
         # data.temperature_c      # Temperature in Celsius
         # data.pressure_pa        # Pressure in Pascals
@@ -93,7 +93,7 @@ defmodule Core.Application do
       Core.ReadingAgent,
 
       #2. Start BMP280 Genserver
-      #bme680_sensor,
+      bme680_sensor,
      
       #3. Start History Genserver 
       #Core.History,

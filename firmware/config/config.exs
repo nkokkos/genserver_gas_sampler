@@ -29,8 +29,14 @@ config :nerves, :firmware, rootfs_overlay: "rootfs_overlay"
 
 # Set the SOURCE_DATE_EPOCH date for reproducible builds.
 # See https://reproducible-builds.org/docs/source-date-epoch/ for more information
+# The Unix Epoch is a standardized starting point for computer time: January 1, 1970, at 00:00:00 UTC.
+# source_date_epoch refers to the Unix Epoch. 
+# It represents the total number of seconds that have elapsed since the "Unix Epoch."
 
-config :nerves, source_date_epoch: "1577975236"
+build_timestamp = System.system_time(:second) |> Integer.to_string()
+config :nerves, source_date_epoch: build_timestamp
+# Hardcoded:
+# config :nerves, source_date_epoch: "1577975236"
 
 # Use Ringlogger as the logger backend and remove :console.
 # See https://hexdocs.pm/ring_logger/readme.html for more information on

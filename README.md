@@ -1,6 +1,6 @@
-# TGS5042 Gas Sensor Poncho Project
+## TGS5042 Gas Sensor Poncho Project
 
-# This is a project in progress
+## This is a project in progress...
 
 This is a [poncho project](https://embedded-elixir.com/post/2017-05-19-poncho-projects/) 
 for Nerves that separates firmware from business logic, targeting **Raspberry Pi Zero W**.
@@ -13,8 +13,8 @@ for Nerves that separates firmware from business logic, targeting **Raspberry Pi
 
 ```
 genserver_gas_sampler/
-├── README.md                    # This file
-├── firmware/                    # Nerves firmware application
+├── README.md                   # This file
+├── firmware/                   # Nerves firmware application
 │   ├── lib/
 │   │   ├── firmware.ex
 │   │   └── firmware/
@@ -28,16 +28,16 @@ genserver_gas_sampler/
 │   │       └── iex.exs         # IEx startup configuration
 │   ├── mix.exs                 # Nerves dependencies
 │   └── test/
-├── core/                  	# OTP business logic (reusable library)
+├── gas_sensor/                 # OTP business logic
 │   ├── lib/
-│   │   ├── core.ex
-│   │   └── core/
+│   │   ├── gas_sensor.ex
+│   │   └── gas_sensor/
 │   │       ├── application.ex  # OTP Application
 │   │       └── sensor.ex       # GenServer for ADC reading
 │   ├── config/
 │   ├── mix.exs
 │   └── test/
-└── ui/              # Phoenix web interface
+└── ui/              		# Phoenix web interface
     ├── lib/
     │   ├── ui/
     │   │   └── application.ex  # Phoenix OTP Application
@@ -53,6 +53,16 @@ genserver_gas_sampler/
 ```
 
 ## Quick Start
+
+
+### Upgrade you elixir nerves 
+
+```bash
+mix local.hex
+mix local.rebar
+mix archive.install hex nerves_bootstrap
+```
+
 
 ### 1. Build and test the gas sensor library
 
@@ -215,13 +225,13 @@ Connect to your Pi Zero W via serial console or SSH, then:
 
 ```elixir
 # Get current PPM reading
-Core.Sensor.get_ppm()
+GasSensor.Sensor.get_ppm()
 
 # Get full state for debugging
-Core.Sensor.get_state()
+GasSensor.Sensor.get_state()
 
 # Use helper for formatted output
-Core.Helpers.gas_info()
+GasSensor.Helpers.gas_info()
 ```
 
 ### Web Interface
