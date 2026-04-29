@@ -38,6 +38,10 @@ config :nerves, source_date_epoch: build_timestamp
 # Hardcoded:
 # config :nerves, source_date_epoch: "1577975236"
 
+# NervesTimeZones provides a way of managing local time on embedded devices. 
+# The default time zone is "Etc/UTC"
+config :nerves_time_zones, default_time_zone: "Etc/UTC"
+
 # Use Ringlogger as the logger backend and remove :console.
 # See https://hexdocs.pm/ring_logger/readme.html for more information on
 # configuring ring_logger.

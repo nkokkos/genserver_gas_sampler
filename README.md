@@ -302,4 +302,6 @@ mix phx.server
 
 ## License
 
-MIT License
+
+
+MMIT LicenseIt License

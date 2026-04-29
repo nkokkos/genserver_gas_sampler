@@ -1,6 +1,4 @@
 import Config
-
-# Add configuration that is only needed when running on the host here.
-
-# Placeholder to prevent warnings when building on host
-config :nerves_runtime, :kernel, use_system_registry: false
+# Enter here configuration for running on host
+# For example, if you do export MIX_TARGET=host, 
+# configation will be read from this file

@@ -17,15 +17,13 @@ defmodule GasSensor.Sensor do
   - Better fault isolation
 
   ## Usage
-
-      # Start the sensor (automatically started with the application)
-      {:ok, pid} = GasSensor.Sensor.start_link()
       
       # Get current PPM reading (prefer Agent for non-blocking access)
       ppm = GasSensor.ReadingAgent.get_ppm()
       
       # Get full state from Agent
       reading = GasSensor.ReadingAgent.get_reading()
+  
   """
 
   use GenServer
@@ -33,12 +31,15 @@ defmodule GasSensor.Sensor do
   import Bitwise
   alias GasSensor.Timestamp
 
-  # ADS1115 I2C address
+  #ADS1115 I2C address
   @ads1115_addr 0x48
 
-  # We use the breakout board ADS1115 adc for sample the output of the sensor + reference voltage
+  # We use the breakout board ADS1115 adc for sampling the output of the sensor + reference voltage
+  # https://www.skroutz.gr/s/54629997/Ads1115-I2c-16-Bit-Adc-4-Channel-Module.html
+
   # The configuration Register - Full 16 bits from the Datasheet:
   # https://www.ti.com/lit/ds/symlink/ads1115.pdf
+  
   # Table 8-3 Config Register Field Descriptions
   # Bit: 15  14  13  12  11  10   9   8    7   6   5   4   3   2   1   0
   #      ├───┼───────────┼──────────┼───┼──────────┼───┼───┼───┼───────┤
@@ -104,30 +105,38 @@ defmodule GasSensor.Sensor do
     case Circuits.I2C.open(i2c_bus) do
       {:ok, ref} ->
         state = %{
+          
+          # This is the default initial state when we try open the i2c bus for the first
+          # time.
 
-          # internal. 
-          i2c: ref,
-          phase: :calibrating,
-          calibration_samples: [],
-          offset_mv: 0.0,
+          # Internal to this genserver instance 
+          i2c: 			ref,
+          phase: 		:calibrating,	#:calibrating | :running
+          calibration_samples:	[],
+          offset_mv: 		0.0,
 
-          # Telemetry
-          co_ppm: 0.0,
-  	  temperature_c: 25.0,
-  	  humidity_rh: 0.0,
-  	  pressure_pa: 0.0,
-  	  dew_point_c: 0.0,
-  	  gas_resistance_ohms: 0.0,
-          cpu_temperature: 0.0,       
-	  adc_status: :no_reading,
-  	  temp_status: :no_reading,
-          timestamp_ms: 0,
+          # Telemetry - values that should be sent to the web interface/iot platform
+          co_ppm: 		0.0,
+  	  temperature_c: 	0.0,
+  	  humidity_rh: 		0.0,
+  	  pressure_pa: 		0.0,
+  	  dew_point_c: 		0.0,
+  	  gas_resistance_ohms:  0.0,
+          cpu_temperature: 	0.0,       
+	  adc_status:  		:no_reading, # :ok | :error_i2c_bus | :no_reading
+  	  temp_status:		:no_reading, # :ok | :error_i2c_bus | :no_reading
+          timestamp_ms: 	0,
 
-          # Diagnostics
-          a0_mv: 0.0, # A0 reference channel voltage — should stay ~2000mv
-          a1_mv: 0.0, # A1 signal channel voltage — raw voltage from the analog circuits where the TGS5042 is attached
-          co_signal_mv: 0.0, # median of co_signal_samples — voltage in millivolts. This voltage is then passed to mv_to_ppm() to produce ppm
-          co_signal_samples: [] # 11 raw (A1×2)-A0 values in millivolts. Median of this list = co_signal_mv
+          # Diagnostics - these valus should be sent to webinterface / iot plaform too.
+          a0_mv: 		0.0, # A0 reference channel voltage — should stay ~2000mv
+
+          a1_mv: 		0.0, # A1 signal channel voltage — 
+				     # raw voltage from the analog circuits where the TGS5042 is attached
+
+          co_signal_mv: 	0.0, # median of co_signal_samples — voltage in millivolts. 
+				     # This voltage is then passed to mv_to_ppm() to produce ppm
+
+          co_signal_samples: 	[]   # 11 raw (A1×2)-A0 values in millivolts. Median of this list = co_signal_mv
         }
 
         # Start first sample immediately
@@ -139,23 +148,27 @@ defmodule GasSensor.Sensor do
         Logger.error("Failed to open I2C bus #{i2c_bus}: #{inspect(reason)}")
         # Update Agent with error status even if we can't start
         GasSensor.ReadingAgent.update(%{
+          
+          # Internal
+          # Don't send internal metrics
+          
           # Telemetry
-          co_ppm: nil,
-          temperature_c: nil,
-          humidity_rh: nil,
-          pressure_pa: nil,
-          dew_point_c: nil,
-          gas_resistance_ohms: nil,
-          cpu_temperature: nil,
-          adc_status:  :error_i2c_bus,
-          temp_status: :error_i2c_bus,
-          timestamp_ms: 0,
+          co_ppm: 	 	nil,
+          temperature_c: 	nil,
+          humidity_rh: 		nil,
+          pressure_pa: 		nil,
+          dew_point_c: 		nil,
+          gas_resistance_ohms:  nil,
+          cpu_temperature: 	nil,
+          adc_status:  		:error_i2c_bus,
+          temp_status: 		:error_i2c_bus,
+          timestamp_ms: 	nil,
 
           # Diagnostics
-          a0_mv: nil, 
-          a1_mv: nil, 
-          co_signal_mv: nil, 
-          co_signal_samples: nil 
+          a0_mv: 		nil, 
+          a1_mv: 		nil, 
+          co_signal_mv:         nil, 
+          co_signal_samples: 	nil 
         })
         {:stop, reason}
     end
@@ -193,10 +206,10 @@ defmodule GasSensor.Sensor do
    
      # Read the data from the BME280.measure(:bme680)
      
+
+
      {:ok, bme680_data } =  BME280.measure(:bme680)
      {:ok, cpu_temp }    =  GasSensor.HardwareTemp.read_cpu_temp()
-     
-     
 
     new_state =
       case read_ads1115(state.i2c) do
@@ -218,7 +231,6 @@ defmodule GasSensor.Sensor do
             state
             | ppm: filtered_ppm,
               window: window,
-              sample_count: state.sample_count + 1,
               status: :ok
           }
 
@@ -252,9 +264,8 @@ defmodule GasSensor.Sensor do
 
   # ── Private Functions ────────────────────────────────────
 
-  defp publisht_agent(state) do
-  
-
+  defp publish_agent(state) do
+   
   end
 
   defp read_ads1115(ref) do

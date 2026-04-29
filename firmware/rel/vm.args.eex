@@ -48,7 +48,6 @@
 -user elixir
 -run elixir start_cli
 
-
 ## Enable colors in the shell
 -elixir ansi_enabled true
 

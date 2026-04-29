@@ -1,6 +1,6 @@
 import Config
 
-# Note:
+# Keep in mind that:
 #MIX_TARGET=host (The "Laptop" Mode)
 #Files Loaded: config.exs → host.exs.
 
