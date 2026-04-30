@@ -4,8 +4,8 @@ defmodule GasSensor.Application do
 
   This application manages:
   1. GasSensor.ReadingAgent - Stores latest reading for non-blocking access
-  2. GasSensor.History - 24-hour ETS-based circular buffer for time-series data
-  3. GasSensor.Sensor - GenServer that reads from ADC via I2C
+  2. GasSensor.History 	    - 7 days ETS-based circular buffer for time-series data
+  3. GasSensor.Sensor 	    - GenServer that reads from ADC via I2C
 
   ## Architecture
 

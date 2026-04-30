@@ -2,14 +2,14 @@ defmodule GasSensor.Sensor do
   @moduledoc """
   GenServer for the TGS5042 Gas Sensor via ADS1115 ADC.
 
-  Samples 11 times evenly spread every 10 seconds.
-  Applies median filter and saves result to state.
+  * Samples 11 times evenly spread every 10 seconds.
+  * Applies median filter and saves result to state.
 
   ## Architecture Note
 
   This GenServer is the ONLY process that accesses the I2C bus.
-  After each reading, it updates the GasSensor.ReadingAgent,
-  which provides non-blocking access for the Phoenix web interface.
+  After each reading, it updates the GasSensor.ReadingAgent, which provides 
+  non-blocking access for the Phoenix web interface.
 
   This design prevents I2C bus contention and ensures:
   - Single writer to I2C (no race conditions)
@@ -31,9 +31,6 @@ defmodule GasSensor.Sensor do
   import Bitwise
   alias GasSensor.Timestamp
 
-  #ADS1115 I2C address
-  @ads1115_addr 0x48
-
   # We use the breakout board ADS1115 adc for sampling the output of the sensor + reference voltage
   # https://www.skroutz.gr/s/54629997/Ads1115-I2c-16-Bit-Adc-4-Channel-Module.html
 
@@ -41,13 +38,47 @@ defmodule GasSensor.Sensor do
   # https://www.ti.com/lit/ds/symlink/ads1115.pdf
   
   # Table 8-3 Config Register Field Descriptions
-  # Bit: 15  14  13  12  11  10   9   8    7   6   5   4   3   2   1   0
+  # Bit:  15  14  13  12  11  10   9  8  7   6   5   4   3   2   1   0
   #      ├───┼───────────┼──────────┼───┼──────────┼───┼───┼───┼───────┤
   #      │OS │  MUX[2:0] │ PGA[2:0] │MOD│  DR[2:0] │CM │CP │CL │CQ[1:0]│
   #      └───┴───────────┴──────────┴───┴──────────┴───┴───┴───┴───────┘
   #       ←────────── MSB (byte 2) ──────────→←──────── LSB (byte 3) ───→
-  
+
+  # ── ADS1115 Config Register Constants ────────────────────
+  # Reference: TI ADS1115 datasheet SBAS444E, Table 8-2
+  #
+  # MSB byte breakdown:
+  #   Bit  15    OS  = 1       → start conversion immediately
+  #   Bits 14-12 MUX           → which channel to read
+  #   Bits 11-9  PGA = 001     → ±4.096V FSR, 0.000125V per count
+  #   Bit  8     MODE = 1      → single-shot (converts once, then sleeps)
+  #
+  # LSB byte breakdown:
+  #   Bits 7-5   DR = 000      → 8 SPS (125ms conversion, lowest noise)
+  #   Bits 4-2                 → comparator settings, all 0 (unused)
+  #   Bits 1-0   COMP_QUE = 11 → comparator disabled
+  #
+  # At 8 SPS: peak-to-peak noise = 125µV
+
+  # ADS1115 Register Addresses:
+  # The ADS1115 has 4 registers. We will use two:
+  #   0x00 → Conversion register  — holds the ADC result
+  #   0x01 → Config register      — controls all chip settings
+  @reg_conversion = 0x00
+  @reg_config     = 0x01
+
+  # We will sample the reference voltage of 2Volts at A0 and at A1 the TGS5042 signal voltage
+  @config_msb_a0    = 0xC3     # 1_100_001_1  → OS=1, MUX=AIN0/GND, PGA=±4.096V, single-shot
+  @config_msb_a1    = 0xD3     # 1_101_001_1  → OS=1, MUX=AIN1/GND, PGA=±4.096V, single-shot
+  @config_lsb       = 0x03     # 0_000_0_0_11 → DR=8SPS, comparator disabled
+
+  @volts_per_count = 0.000125  # ±4.096V / 32768 counts = 125µV per LSB 
+
   # ASDS1115 configuration: 
+  
+  #ADS1115 I2C address
+  @ads1115_addr 0x48
+  
   @conversion_ms 140 	 # time to wait for the conversion register to get ready
   @total_window  10_000  # how often we should we sample the inputs
   @num_samples   11      # sample 11 times for the median filter
@@ -57,6 +88,54 @@ defmodule GasSensor.Sensor do
   @sensitivity_na_per_ppm 1.525 	# this is the number printed on the module we got.
   @r3_ohms 		  1_200_000     # feed back resistor connected to the mcp6042 Op amp
   @divider_factor 	  ( 9.95 / (9.95 + 9.95) ) 
+ 
+  # Temperature compensation table for TGS5042
+  # This is based in the application note
+  # "APPLICATION NOTES FOR TGS5xxx SERIES" - Revised 12/25
+  
+  # Appendix 2 - Temperature Compensation Coefficients for Residential Usage:
+  @temp_cf_table %{
+    -10 => 0.752, -9  => 0.761, -8  => 0.771, -7 => 0.780,
+    -6  => 0.789, -5  => 0.799, -4  => 0.808, -3 => 0.817,
+    -2  => 0.826, -1  => 0.835,  0  => 0.844, 1 => 0.852,
+     2  => 0.861,  3  => 0.870,  4  => 0.878, 5 => 0.887,
+     6  => 0.895,  7  => 0.903,  8  => 0.911, 9 => 0.919,
+     10 => 0.927,  11 => 0.935,  12 => 0.943, 13 => 0.950,
+     14 => 0.958,  15 => 0.965,  16 => 0.972, 17 => 0.980,
+     18 => 0.987,  19 => 0.994,  20 => 1.000, 21 => 1.007,
+     22 => 1.013,  23 => 1.020,  24 => 1.026, 25 => 1.032,
+     26 => 1.038,  27 => 1.044,  28 => 1.050, 29 => 1.055,
+     30 => 1.060,  31 => 1.066,  32 => 1.071, 33 => 1.076,
+     34 => 1.080,  35 => 1.085,  36 => 1.089, 37 => 1.094,
+     38 => 1.098,  39 => 1.101,  40 => 1.105, 41 => 1.109,
+     42 => 1.112,  43 => 1.115,  44 => 1.118, 45 => 1.121,
+     46 => 1.124,  47 => 1.126,  48 => 1.128, 49 => 1.130,
+     50 => 1.132,  51 => 1.134,  52 => 1.135, 53 => 1.136,
+     54 => 1.137,  55 => 1.138
+  }
+ 
+  #According to the datasheet at 6-3:
+  #6-3 Temperature compensation
+  # It is necessary to continuously write the thermistor output into the microprocessor. Inside the
+  # microprocessor, temperature compensation is carried
+  # out by using the compensation coefficient table shown in Appendix 2. 
+  # CO sensitivity at 20˚C (α) is calculate by the following equation:
+  # α = αt / CF
+  # where:
+  # CF = compensation coefficient at t˚ αt = CO sensitivity at t˚C
+  # 6-4 Calculation of CO concentration
+  # CO concentration (C) can be calculated by using
+  # sensor output (Vout), sensor output in clean air (V0),
+  # CO sensitivity at 20 ˚C (α), and feedback resistor (Rf)
+  # in the following formula:
+  # C = (V0 – Vout) / (α × Rf) [Equation 1]
+  # When high accuracy is required, temperature
+  # dependency of an op-amp should be considered
+  
+  # Please note, that since we use an non inverting analog setup in our 
+  # circuits the correct formula for our case is:
+  # C = (Vout - V0) / (α × Rf) where V0 = Offset voltage at 0 CO ppm 
+
 
   # ── Public API ──────────────────────────────────────────
 
@@ -205,10 +284,9 @@ defmodule GasSensor.Sensor do
      # :ok
    
      # Read the data from the BME280.measure(:bme680)
-     
-
-
      {:ok, bme680_data } =  BME280.measure(:bme680)
+
+     # Read cpu temperature
      {:ok, cpu_temp }    =  GasSensor.HardwareTemp.read_cpu_temp()
 
     new_state =
@@ -268,6 +346,154 @@ defmodule GasSensor.Sensor do
    
   end
 
+  defp read_ads1115(state.ref) do 
+  
+    with {:ok, raw_a0} <- read_channel(config.msb_a0, state.ref),
+         {:ok, raw_a1} <- read_channel(config.msb_a1, state.ref) 
+    do
+      # 1. Convert raw counts to volts
+      v_ref    = raw_a0 * @volts_per_count
+      v_halved = raw_a1 * @volts_per_count
+
+      # 2. Reconstruct the signal
+      # Multiply by 2.0 to reverse the hardware voltage divider
+      v_op_amp = v_halved * 2.0
+
+      # 3. Calculate differential
+      # This removes the ~2.0V bias of the reference singal to isolate the sensor signal
+      # differential = v_op_amp - v_ref
+      {:ok, differential}
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  
+  end
+
+  # ── Trigger and Read One Channel ──────────────────────────
+  # Writes the config register to start a single-shot conversion
+  # on the requested channel, waits for the OS bit to confirm
+  # completion, then reads and returns the raw signed integer.
+  #
+  # config_msb selects the channel:
+  # 0xC3 → AIN0/GND (my A0 reference voltage)
+  # 0xD3 → AIN1/GND (my A1 signal voltage)
+  defp read_channel(config_msb, i2c_ref)
+  
+    # Trigger conversion.
+    # Write 3 bytes to the chip:
+    #   byte 1: reg_config (0x01) → "This is the config register"
+    #   byte 2: config_msb        → channel + PGA + single-shot + start
+    #   byte 3: config_lsb        → 8 SPS + comparator disabled
+    
+    # If any step fails, it bubble the error to the caller
+    with :ok <- Circuits.I2C.write(i2c_ref, @ads1115_addr, <<@reg_config, config_msb, @config_lsb>>),
+         :ok <- wait_for_ready(ref),
+         {:ok, raw_value} <- read_conversion(ref) do
+    
+      # If everything succeeded, we return the final result
+      {:ok, raw_value}
+    else
+      # If ANY step above returned {:error, reason}, it lands here.
+      # We simply pass that error back up the chain.
+      {:error, reason} -> {:error, reason}
+    
+      # Optional: Catch-all for unexpected returns
+      error -> {:error, error}
+    end
+
+  end
+ 
+
+  # ── Read Conversion Result ────────────────────────────────
+  # Reads the 16-bit signed result from the conversion register.
+  #
+  # Uses write_read (atomic):
+  #   write: <<reg_conversion>> sets register pointer to 0x00
+  #   read:  2 bytes returns the ADC result (MSB first)
+  #   Single I2C transaction — bus held throughout.
+  #   This is critical since BME680 and ADS1115 share the same bus.
+  # Note these difference between atomic and not atomic:
+  # Circuits.I2C.write(ref, address, <<0x00>>)   # transaction 1 — set pointer
+  # Circuits.I2C.read(ref, address, 2)           # transaction 2 — read result
+  # This code — ONE atomic I2C transaction
+  # Circuits.I2C.write_read(ref, @ads1115_addr, <<@reg_conversion>>, 2)
+  # write and read happen without releasing the bus between them
+  defp read_conversion(state.ref)
+    case Circuits.I2C.write_read(state.ref,@ads1115_addr, <<@reg_conversion>>, 2) do
+      {:ok, <<msb, lsb>>} ->
+        # Step 1 — Read  the 2 bytes and convert them to one 16-bit unsigned integer.
+        #
+        # Example: msb = 0x0C = 0000_1100
+        #          lsb = 0xD4 = 1101_0100
+        #
+        # msb <<< 8 shifts msb left by 8 positions:
+        #   0000_1100 → 0000_1100_0000_0000 = 0x0C00 = 3072
+        # and then OR with lsb:
+        # ||| lsb ORs in the low byte:
+        #   0000_1100_0000_0000
+        # | 0000_0000_1101_0100
+        # = 0000_1100_1101_0100 = 0x0CD4 = 3284
+        raw = msb <<< 8 ||| lsb
+
+        # Step 2 — Convert unsigned to signed (two's complement).
+        #
+        # ADS1115 returns signed values. Elixir integers are
+        # unsigned by default so we must handle the sign manually.
+        #
+        # Unsigned 16-bit range: 0      to 65535
+        # Signed   16-bit range: -32768 to +32767
+        #
+        # Any value above 32767 has its sign bit (bit 15) set = negative:
+        #   32768 → -32768  (0x8000 → most negative)
+        #   65535 → -1      (0xFFFF → minus one)
+        #   3284  →  3284   (positive, no change needed)
+        #
+        # Subtracting 65536 (= 2^16) recovers the correct signed value:
+        #   65535 - 65536 = -1     ✅
+        #   32768 - 65536 = -32768 ✅
+        #   3284  stays as  3284   ✅
+        raw = if raw > 32767, do: raw - 65536, else: raw
+        
+        # We could use the following line too, instead of steps 1 and 2 above 
+        # but we chose the manual above for clarity.
+        # Note, that we need to include the library Bitwise for this to work
+        #<<raw::signed-integer-size(16)>> = <<msb, lsb>> # Elixir does it all in one line
+
+      {:ok, raw}
+
+    {:error, reason} ->
+      {:error, reason}
+    end
+
+  end
+
+  # We start polling for 20 times every 10 msec
+  defp wait_for_ready(ref, address) do
+    do_poll(ref, address, 20)
+  end
+
+  # Use case with pattern matching. When attempts reach 0, return a timeout error:
+  defp do_poll(_ref, _address, 0), do: {:error, :conversion_timeout}
+
+  # Recursive case: Perform the atomic write_read and check the OS bit
+  defp do_poll(ref, address, attempts_left) do
+    # Atomic operation: sets pointer and reads config in one bus transaction
+    case Circuits.I2C.write_read(ref, address, <<@reg_config>>, 2) do
+      {:ok, <<msb, _lsb>>} ->
+      # Check if bit 7 (Operational Status) is high (1 = ready)
+        if (msb &&& 0x80) == 0x80 do
+          :ok
+        else
+          # Still busy: Wait 10ms and decrement the counter
+          Process.sleep(10)
+          do_poll(ref, address, attempts_left - 1)
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   defp read_ads1115(ref) do
     with :ok <- trigger_conversion(ref),
          :ok <- wait_for_conversion(),
@@ -300,6 +526,7 @@ defmodule GasSensor.Sensor do
     end
   end
 
+  # this need to be fixed, there is an error here...
   defp raw_to_ppm(raw) do
     # Step 1: raw ADC to millivolts (PGA ±2.048V = 0.0625mV per bit)
     mv = raw * 0.0625
