@@ -289,6 +289,7 @@ defmodule GasSensor.Sensor do
      # Read cpu temperature
      {:ok, cpu_temp } =  GasSensor.HardwareTemp.read_cpu_temp()
 
+      # 
       # 11 samples for median filter
       samples = for _ <- 1..11, do: read_ads1115(state.i2c)
 
@@ -511,54 +512,40 @@ defp get_correction_factor(temp) do
 end
 
 
-  # this need to be fixed, there is an error here...
-  defp raw_to_ppm(raw) do
-   
-  #According to the datasheet at 6-3:
-  #6-3 Temperature compensation
-  # It is necessary to continuously write the thermistor output into the microprocessor. Inside the
-  # microprocessor, temperature compensation is carried
-  # out by using the compensation coefficient table shown in Appendix 2. 
-  # CO sensitivity at 20˚C (α) is calculate by the following equation:
-  # α = αt / CF
-  # where:
-  # CF = compensation coefficient at t˚ αt = CO sensitivity at t˚C
-  # 6-4 Calculation of CO concentration
-  # CO concentration (C) can be calculated by using
-  # sensor output (Vout), sensor output in clean air (V0),
-  # CO sensitivity at 20 ˚C (α), and feedback resistor (Rf)
-  # in the following formula:
-  # C = (V0 – Vout) / (α × Rf) [Equation 1]
-  # When high accuracy is required, temperature
-  # dependency of an op-amp should be considered
+# Final PPM conversion using the differential
+#According to the datasheet at 6-3:
+#6-3 Temperature compensation
+# It is necessary to continuously write the thermistor output into the microprocessor. Inside the
+# microprocessor, temperature compensation is carried
+# out by using the compensation coefficient table shown in Appendix 2. 
+# CO sensitivity at 20˚C (α) is calculate by the following equation:
+# α = αt / CF
+# where:
+# CF = compensation coefficient at t˚ αt = CO sensitivity at t˚C
+# 6-4 Calculation of CO concentration
+# CO concentration (C) can be calculated by using
+# sensor output (Vout), sensor output in clean air (V0),
+# CO sensitivity at 20 ˚C (α), and feedback resistor (Rf)
+# in the following formula:
+# C = (V0 – Vout) / (α × Rf) [Equation 1]
+# When high accuracy is required, temperature
+# dependency of an op-amp should be considered
   
-  # Please note, that since we use an non inverting analog setup in our 
-  # circuits the correct formula for our case is:
-  # C = (Vout - V0) / (α × Rf) where V0 = Offset voltage at 0 CO ppm
+# Please note, that since we use an non inverting analog setup in our 
+# circuits the correct formula for our case is:
+# C = (Vout - V0) / (α × Rf) where V0 = Offset voltage at 0 CO ppm
 
-    # Step 1: raw ADC to millivolts (PGA ±2.048V = 0.0625mV per bit)
-    mv = raw * 0.0625
+defp convert_to_ppm(differential, temp) do
+  cf = get_correction_factor(temp)
+  
+  # subtract any leftover calibration offset if necessary
+  true_signal = differential - (@calibrated_zero_offset * 2)
+  
+  alpha = (@sensitivity_na_per_ppm * 1.0e-9) * cf
 
-    # Step 2: millivolts to volts
-    voltage_diff = mv / 1000.0
+  # Since we can't have "negative" gas, this line ensure that we always sees 0.0 if the air is clean.
+  # clamp this to a valid range
+  (true_signal / (alpha * @r3_ohms)) |> max(0.0) |> min(10_000.0)
+end
 
-    # Step 3: undo voltage divider
-    actual_diff = voltage_diff * @divider_factor
-
-    # Step 4: convert to ppm
-    # ppm = actual_diff / (sensitivity_A/ppm × R3)
-    sensitivity_amps = @sensitivity_na_per_ppm * 1.0e-9
-    ppm = actual_diff / (sensitivity_amps * @r3_ohms)
-
-    # Clamp to valid range
-    ppm
-    |> max(0.0)
-    |> min(10_000.0)
-  end
-
-  defp median(samples) do
-    sorted = Enum.sort(samples)
-    mid = div(length(sorted), 2)
-    Enum.at(sorted, mid)
-  end
 end
