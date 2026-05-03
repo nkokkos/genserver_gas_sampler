@@ -23,14 +23,14 @@ defmodule GasSensor.HardwareTemp do
       case File.read(pi_temp_path) do
         {:ok, raw} ->
           {millidegrees, _} = Integer.parse(String.trim(raw))
-          millidegrees / 1000.0
-        _ -> 25.0
+          {:ok, millidegrees / 1000.0}
+        _ -> {:ok, 25.0}
       end
     else
       # Fallback for your host development environement like VirtualBox environment
       # This generates a random float between 35.0 and 45.0
-      :rand.uniform() * 10 + 35
-      |> Float.round(1)
+      temp = (:rand.uniform() * 10 ) + 35 |> Float.round(1)
+      {:ok, temp}
     end
   end
 

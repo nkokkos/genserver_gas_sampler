@@ -45,12 +45,24 @@ defmodule GasSensor.Application do
   """
   use Application
 
+
+
+  # add build date to the firmware:
+  # Note: when you do: mix firmware, build_date will be burned into the .beam file
+  # so this will true after compilation: GasSensor.Application.build_date()
+  @build_date DateTime.utc_now()   # just a module attribute, nothing special
+  def build_date, do: @build_date  # expose it as a public function
+
   # grab the real sensor from the config
   # if we compile on host, use the fake sensor 
-  @bme680 Application.compile_env(:gas_sensor, :bme680_module)
-
-  @impl true
+  @bme680 Application.compile_env(:gas_sensor, :bme680_module, BMP280)
+  
+  @impl true 
   def start(_type, _args) do
+
+    # Get I2C bus from application configuration (defaults to "i2c-1")
+    # If you are on dev mode on host, i2c_bus will be i2c_bus_stub
+    i2c_bus = Application.get_env(:gas_sensor, :i2c_bus, "i2c-1")
 
     # Provision for real vs fake bme680 sensor
     bme680_sensor =
@@ -73,10 +85,10 @@ defmodule GasSensor.Application do
         # therefore, to get readings from this sensor:
         # {:ok, data} = BMP280.measure(:bme680)
         { 
-          BMP280, # the module to start 
-          bus_name: "i2c-1", 
-          bus_address: 0x77, 
-          name: :bme680
+          BMP280,            # the module to start 
+          bus_name: i2c_bus, # the I2C bus name
+          i2c_address: 0x77, # the i2c address
+          name: :bme680      # pick up a name for the genserver process
         }
        # and below when you call Supervisor.start_link(children, opts)
        # you start the genserver for this module
@@ -87,25 +99,22 @@ defmodule GasSensor.Application do
     # Initialize timestamp module (records boot time, sets up offline tracking)
     GasSensor.Timestamp.init()
 
-    # Get I2C bus from application configuration (defaults to "i2c-1")
-    # If you are on dev mode on host, i2c_bus will be i2c_bus_stub
-    i2c_bus = Application.get_env(:gas_sensor, :i2c_bus, "i2c-1")
-
     children = [
 
-      # 1. Reading Agent starts first. Always available for web requests 
+      # Reading Agent starts first.
       GasSensor.ReadingAgent,
 
-      # 2. BMP280 Genserver
+      # Start the BMP280 Genserver for reading the BMP680 breakout board:
       bme680_sensor,
      
-      # 3. History Genserver 
+      #Start the History Genserver which is responsible to saving 
+      #historical data
       GasSensor.History,
 
-      # 4. Sensor - only process that touches I2C
+      # Finally, start GasSensor - only process that touches I2C
       # Depends on ReadingAgent and History (must start after)
       # Pass I2C bus configuration from app config
-      # {GasSensor.Sensor, [i2c_bus: i2c_bus]}
+      #{GasSensor.Sensor, [i2c_bus: i2c_bus]}
     ]
 
     opts = [strategy: :one_for_one, name: GasSensor.Supervisor]

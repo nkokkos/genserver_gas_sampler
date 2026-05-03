@@ -2,23 +2,12 @@
 
 import Config
 
-# This is the configuration imported at application.ex
-
-# Delux uses a slot system to prevent different parts of your code fighting for the LED:
-
-# You have 3 slots-> :user_feedback, :notification and :status
-
-# :user_feedback (Highest Priority): Temporary blips, like acknowledging a button press. 
-# It "covers up" anything below it until it's finished.
-
-# :notification (Medium Priority): Transient alerts that need attention (e.g., an error occurred).
-
-# :status (Lowest Priority): The background state (e.g., "I'm alive" or "Searching for WiFi").
-
 # On the Raspberry Pi Zero, the ACT LED is the small green light near the micro-USB power port.
 # By default, Linux uses it to show SD card activity. In Nerves, we take control of it so it 
 # can communicate your application's health and logic.
 
+# This does not work for the indicators and delux.Leave it here for the time being.
+# Just look in the application.ex file for more.
 config :firmware,
   indicators: %{
     onboard_led: %{ # name for the LED group
@@ -26,3 +15,9 @@ config :firmware,
     }
   }
 
+# these keys will be available to rpi0 or real firmware on a real device
+# Note that temp_path refers to a real path on the rasberry pi zero wireless
+config :gas_sensor,
+  i2c_bus: "i2c-1",
+  bme680_module: BMP280,
+  temp_path: "/sys/class/thermal/thermal_zone0/temp"

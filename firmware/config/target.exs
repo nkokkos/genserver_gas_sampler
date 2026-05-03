@@ -107,6 +107,7 @@ config :nerves_time, :servers, [
 # Step 1. Before creating new keys, you should clear the old ones to avoid confusion. 
 # In your terminal, run:
 # rm ~/.ssh/id_rsa ~/.ssh/id_rsa.pub
+# rm ~/.ssh/id_ed25519 ~/.ssh/id_ed25519.pub  
 
 # Step 2. Generate the New Key Pair
 # Run the following command to create a new ED25519 key (this is the modern, more secure standard, 

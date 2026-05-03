@@ -26,7 +26,7 @@ defmodule GasSensor.History do
 
   ## Memory Efficiency
 
-  We sample every 10 seconds for the maximum time of 7 days = 604800 seconds / 10 seconds = 60,480 samples 
+  We sample every 15 seconds for the maximum time of 7 days = 604800 seconds / 15 seconds = 40,320 samples 
   in 7 days
 
   - 60,480 samples × 400 bytes ≈ 24,192,000 bytes
@@ -104,12 +104,7 @@ defmodule GasSensor.History do
   def start_link(_opts \\ []) do
     GenServer.start_link(__MODULE__, [], name: __MODULE__)
   end
-
-  def record_to_ets(timestamp, reading) do 
-    :ets.insert(@table_name, {timestamp, reading})
-    :ok
-  end
-
+  
   @doc """
   Gets all samples from the last 24 hours.
   Returns list of %{timestamp: DateTime, reading_tuple, status: atom}

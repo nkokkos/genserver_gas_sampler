@@ -149,20 +149,20 @@ if [ "$NUCLEAR" = true ]; then
   fi
   
   # Step 2: gas_sensor_web
-  echo -e "${BLUE}Cleaning gas_sensor_web...${NC}"
-  cd "$PROJECT_ROOT/gas_sensor_web"
-  if [ -d "_build" ]; then
-    rm -rf _build
-    echo -e "${GREEN}  ✓ Removed _build/$(format_size $GAS_SENSOR_WEB_SIZE)${NC}"
-  else
-    echo "  - _build/ (already clean)"
-  fi
-  if [ -d "deps" ]; then
-    rm -rf deps
-    echo -e "${GREEN}  ✓ Removed deps/${NC}"
-  else
-    echo "  - deps/ (already clean)"
-  fi
+  #echo -e "${BLUE}Cleaning gas_sensor_web...${NC}"
+  #cd "$PROJECT_ROOT/gas_sensor_web"
+  #if [ -d "_build" ]; then
+  #  rm -rf _build
+  #  echo -e "${GREEN}  ✓ Removed _build/$(format_size $GAS_SENSOR_WEB_SIZE)${NC}"
+  #else
+  #  echo "  - _build/ (already clean)"
+  #fi
+  #if [ -d "deps" ]; then
+  #  rm -rf deps
+  #  echo -e "${GREEN}  ✓ Removed deps/${NC}"
+  #else
+  #  echo "  - deps/ (already clean)"
+  #fi
   
   # Step 3: sampler
   echo -e "${BLUE}Cleaning sampler...${NC}"

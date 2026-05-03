@@ -14,9 +14,9 @@ defmodule GasSensor do
   ## Usage
 
       # Get current reading
-      ppm = Core.Sensor.get_ppm()
+      ppm = GasSensor.Sensor.get_ppm()
       
       # Get full state
-      state = Core.Sensor.get_state()
+      state = GasSensor.Sensor.get_state()
   """
 end

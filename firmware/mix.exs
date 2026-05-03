@@ -76,9 +76,8 @@ defmodule Firmware.MixProject do
       {:vintage_net_direct, "~> 0.10.7",  targets: @all_targets},
       {:vintage_net_wizard, "~> 0.4",     targets: @all_targets},
 
-
-      #NervesTime keeps the system clock on Nerves devices in sync 
-      #when connected to the network and close to in sync when disconnected.
+      # NervesTime keeps the system clock on Nerves devices in sync 
+      # when connected to the network and close to in sync when disconnected.
       {:nerves_time, "~> 0.4.2", 	   targets: @all_targets},
 
       # NervesTimeZones provides a way of managing local time on embedded devices.  
@@ -86,28 +85,34 @@ defmodule Firmware.MixProject do
 
       # add blinky dependency so it always flashes while the app is up
       # https://github.com/nerves-project/nerves_examples/tree/main/blinky
+      # Look into the application.ex to see how it is used
       {:delux, "~> 0.4.1", targets: @all_targets},
 
       # We will use I2C mainly for the breakout boards
+      # These are included in the mix file of the otp app:
+      # gas_sensor. They exist here as commented entries for
+      # reference
       #{:circuits_gpio,  "~> 2.0"},
       #{:circuits_i2c,   "~> 2.0"},
-      #{:pinout,         "~> 0.1"},
 
       # Use Bosch barometric pressure sensors in Elixir 
       # Use this library maintained by Frank Hunleth:
       # https://github.com/elixir-sensors/bmp280
+      # This is included in the mix file of the otp app:
+      # gas_sensor. It is included here as reference.
       #{:bmp280, "~> 0.2" },
 
-      # Business logic from local poncho
-      # This app contains all the logic needed to read the sensors and
-      # push the data out
-      
       # Poncho dependencies
       # See https://embedded-elixir.com/post/2017-05-19-poncho-projects
+      # This OTP app contains all the business logic of communicating
+      # with the boards and getting the data out.
+      # Including this otp this way, it forces the supervisor to start 
+      # the app as dependency.
       {:gas_sensor, path: "../gas_sensor", env: Mix.env()},
 
       # Phoenix web interface that sports a simple web page that displays
       # data in live view
+      # Don't start it yes. Work is in progress
       # {:gas_sensor_web, path: "../gas_sensor_web", targets: @targets},
     
     ]

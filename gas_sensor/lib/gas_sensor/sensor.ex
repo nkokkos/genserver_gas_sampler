@@ -85,7 +85,6 @@ defmodule GasSensor.Sensor do
   # TGS_5042 Sensor calibration: 
   @sensitivity_na_per_ppm 1.525 	# this is the number printed on the module we got.
   @r3_ohms 1_200_000                    # feed back resistor connected to the mcp6042 Op amp
-  @divider_factor ( 9.95 / (9.95 + 9.95) ) 
  
   # Temperature compensation table for TGS5042
   # This is based in the application note
@@ -141,18 +140,18 @@ defmodule GasSensor.Sensor do
   # or in case of an  error, when it happens, send this over to 
   # the reading agent along with an error.
   @empty_reading %{
-    co_ppm: nil,
-    temperature_c: nil,
-    humidity_rh: nil,
-    pressure_pa: nil,
-    dew_point_c: nil,
-    gas_resistance_ohms: nil,
-    cpu_temperature: nil,
-    vref: nil,
-    vsensor: nil,
-    vsensor_offset: nil,
-    vdifferential: nil,
-    vref_variance: nil,
+    co_ppm: 0.0,
+    temperature_c: 0.0,
+    humidity_rh: 0.0,
+    pressure_pa: 0.0,
+    dew_point_c: 0.0,
+    gas_resistance_ohms: 0.0,
+    cpu_temperature: 0.0,
+    vref: 0.0,
+    vsensor: 0.0,
+    vsensor_offset: 0.0,
+    vdifferential: 0.0,
+    vref_variance: 0.0,
   }
 
   # ── Public API ──────────────────────────────────────────
@@ -284,15 +283,27 @@ defmodule GasSensor.Sensor do
          new_state
         else 
           {:error, reason} ->
-            new_state = 
-              state 
-                |> Map.merge(@empty_reading)
-                |> Map.put(:error_message, "Hardware i2c error: #{inspect(reason)}")
-      
+             Logger.error("GasSensor error with value: #{inspect(reason)}")
+             new_state =
+               @empty_reading
+               |> Map.put(:i2c, state.i2c)  # keep the i2c ref so we can retry next sample
+               |> Map.put(:error_message,   "Hardware i2c error: #{inspect(reason)}")
+             
              GasSensor.ReadingAgent.add_sample(new_state, :error)  
-
              #returns the new state and it assigns it to result
              new_state
+
+          unexpected ->
+            # This catches everything else 
+            Logger.error("GasSensor unexpected with clause value: #{inspect(unexpected)}")
+            new_state =
+              @empty_reading
+              |> Map.put(:i2c, state.i2c)
+              |> Map.put(:error_message, "Unexpected value: #{inspect(unexpected)}")
+
+              GasSensor.ReadingAgent.add_sample(new_state, :error)
+              # returns new state and assigns it to result
+              new_state
        end
 
       # Schedule next sample
@@ -368,9 +379,6 @@ defmodule GasSensor.Sensor do
       # If ANY step above returned {:error, reason}, it lands here.
       # We simply pass that error back up the chain.
       {:error, reason} -> {:error, reason}
-      # Optional: Catch-all for unexpected returns, 
-      # Check if the last line is enabled what happens.
-      # error -> {:error, error}
     end
 
   end
@@ -441,7 +449,7 @@ defmodule GasSensor.Sensor do
   end
 
   # We start polling for 20 times every 10 msec, so the maximum
-  # time will spend polling would 200 msec
+  # time will spend polling would be 200 msec
   defp wait_for_ready(ref, address) do
     do_poll(ref, address, 20)
   end

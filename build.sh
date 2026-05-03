@@ -32,12 +32,12 @@ echo -e "${GREEN}✓ gas_sensor compiled successfully${NC}"
 echo ""
 
 # Step 2: Build gas_sensor_web (Phoenix web interface)
-echo -e "${YELLOW}Step 2: Building gas_sensor_web (web interface)...${NC}"
-cd "$PROJECT_ROOT/gas_sensor_web"
-mix deps.get
-mix compile
-echo -e "${GREEN}✓ gas_sensor_web compiled successfully${NC}"
-echo ""
+#echo -e "${YELLOW}Step 2: Building gas_sensor_web (web interface)...${NC}"
+#cd "$PROJECT_ROOT/gas_sensor_web"
+#mix deps.get
+#mix compile
+#echo -e "${GREEN}✓ gas_sensor_web compiled successfully${NC}"
+#echo ""
 
 # Step 3: Build sampler firmware (Nerves)
 echo -e "${YELLOW}Step 3: Building sampler firmware (Nerves)...${NC}"
