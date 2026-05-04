@@ -35,6 +35,10 @@ defmodule GasSensor.Application do
   # so this will be true after compilation: GasSensor.Application.build_date()
   @build_date DateTime.utc_now()   # just a module attribute, nothing special
   def build_date, do: @build_date  # expose it as a public function
+  
+  # This variable used in timestamp.
+  Application.put_env(:gas_sensor, :boot_monotonic, System.monotonic_time(:second))
+
 
   # grab the real sensor from the config
   # if we compile on host, use the fake sensor 
@@ -43,6 +47,10 @@ defmodule GasSensor.Application do
   @impl true 
   def start(_type, _args) do
 
+    # Capture the monotonic zero point at runtime — in this BEAM instance.
+    # Used by Timestamp.provisional_timestamp/0 to compute elapsed seconds since boot.
+    Application.put_env(:gas_sensor, :boot_monotonic, System.monotonic_time(:second))
+  
     # Get I2C bus from application configuration (defaults to "i2c-1")
     # If you are on dev mode on host, i2c_bus will be i2c_bus_stub
     i2c_bus = Application.get_env(:gas_sensor, :i2c_bus, "i2c-1")
@@ -88,7 +96,7 @@ defmodule GasSensor.Application do
       GasSensor.ReadingAgent,
 
       # Start the BMP280 Genserver for reading the BMP680 breakout board:
-      bme680_sensor,
+      # bme680_sensor,
      
       # Start the History Genserver which is responsible to saving 
       # historical data
@@ -97,7 +105,7 @@ defmodule GasSensor.Application do
       # Finally, start GasSensor - only process that touches I2C
       # Depends on ReadingAgent and History (must start after)
       # Pass I2C bus configuration from app config
-      { GasSensor.Sensor, [i2c_bus: i2c_bus] }
+      # { GasSensor.Sensor, [i2c_bus: i2c_bus] }
     ]
 
     opts = [strategy: :one_for_one, name: GasSensor.Supervisor]

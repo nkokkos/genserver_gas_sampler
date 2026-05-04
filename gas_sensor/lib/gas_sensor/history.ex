@@ -3,10 +3,6 @@ defmodule GasSensor.History do
 
   ETS-based circular buffer for a maximum 7 days sensor history.
 
-  This module stores all sensor readings in an in-memory ETS table,
-  providing O(1) access to historical data for graphing and analysis.
-  Automatic cleanup removes entries older than 168 hours.
-
   The sensor readings include readings from the breakout board BME680 plus
   carbon monoxide ppm readings from the ads1115 adc module
 
@@ -39,13 +35,6 @@ defmodule GasSensor.History do
   3. **No disk I/O** - Preserves SD card, faster than SQLite
   4. **Built-in** - No extra dependencies
   5. **Automatic cleanup** - Old entries deleted automatically
-
-  ## Alternatives Considered
-
-  - **Agent with list**: O(n) lookups, memory fragmentation ❌
-  - **SQLite**: 10-20MB overhead, SD card wear ❌
-  - **File append**: Slow reads, SD wear ❌
-  - **ETS**: Perfect fit for embedded ✅
 
   ## Usage
 
@@ -82,9 +71,6 @@ defmodule GasSensor.History do
 
   # 24 hours retention
   @retention_seconds_24h	86400  # 24 hours in seconds 
-
-  # 7 days in hours:
-  @max_retention_hours		168    # 7 days in hours
   
   # Cleanup every 60 seconds, 60_000 here refers to milliseconds
   @cleanup_interval 60_000
@@ -103,7 +89,8 @@ defmodule GasSensor.History do
   Called by GasSensor.ReadingAgent.
   """
   def record_to_ets(timestamp, reading) do
-    :ets.insert(@table_name, {timestamp, reading})
+    unix_ts = DateTime.to_unix(timestamp, :millisecond)
+    :ets.insert(@table_name, {unix_ts, reading})
   end
 
   @doc """
@@ -142,26 +129,37 @@ defmodule GasSensor.History do
       samples = Core.History.get_since(one_hour_ago)
   """
   def get_since(%DateTime{} = datetime) do
+    
     # Match spec for a 2-element tuple: {timestamp, reading_map}
-    # $1 is the timestamp, $2 is the map containing your 7 metrics
+    # $1 is the timestamp, $2 is the map containing your 7 metricsi
+   
+    cutoff_ms = DateTime.to_unix(datetime, :millisecond)
+
     match_spec = [
       {
-        {:"$1", :"$2"},                      # Pattern to match
-        [{:>=, :"$1", {:const, datetime}}],  # Filter: timestamp >= datetime
-        [{{:"$1", :"$2"}}]                   # Result format: return the whole tuple
+        {:"$1", :"$2"},            # Pattern to match
+        [{:>=, :"$1", cutoff_ms}], # Filter: timestamp >= datetime
+        [{{:"$1", :"$2"}}]         # Result format: return the whole tuple
       }
     ]
 
     @table_name
     |> :ets.select(match_spec)
-    |> Enum.map(fn {ts, reading} ->
-      # reading is the map %{co_ppm: _, temperature_c: _, ...}
-      # We inject the timestamp into the map so the graphing tool has it in the same object
-      Map.put(reading, :timestamp, ts)
-    end)
+    |> Enum.map(fn {unix_ms, reading} ->
+     # rebuild from the ETS key
+     ts = DateTime.from_unix!(div(unix_ms, 1_000))
+     
+     reading 
+     |> Map.put(:timestamp, ts)
+     |> Map.put(:timestamp_iso, DateTime.to_iso8601(ts)) 
+   end)
     # Since it's an :ordered_set, it's already sorted by timestamp.
     # This sort is just a safety measure for the graphing engine.
     |> Enum.sort_by(& &1.timestamp, DateTime)
+   
+    # Note this why we used DateTime.to_iso8601
+    # :timestamp_iso
+    # VegaLite cannot read Elixir DateTime structs. Use the :timestamp_iso field
   end
 
 
@@ -287,7 +285,6 @@ defmodule GasSensor.History do
     Process.send_after(self(), :cleanup, @cleanup_interval)
   end
 
-  
   defp cleanup_old_entries do
     # Calculate the "Expiration Date"
     cutoff = DateTime.add(GasSensor.Timestamp.now(), -@retention_seconds)
@@ -324,8 +321,6 @@ defmodule GasSensor.History do
   2. **Feature Extraction:** For every bucket, it identifies:
       - The **First** sample (to maintain chronological continuity).
       - The **Peak CO** sample (to capture the "worst-case" air quality event).
-  3. **Reconstitution:** Merges, deduplicates, and re-sorts these samples to provide 
-     a "High-Fidelity Envelope" of the 30-day run.
 
   ## Parameters
     - `samples`: A list of `%GasSensor.Sample{}` structs containing 7 environmental metrics.
@@ -337,19 +332,44 @@ defmodule GasSensor.History do
   defp downsample(samples, max_points) when length(samples) <= max_points, do: samples
 
   defp downsample(samples, max_points) do
+    
     # Calculate the 'temporal width' of a single pixel-cluster
+
     bucket_size = max(1, div(length(samples), max_points))
+
+    # chunk_every produces:
+    # [
+    #  [r1, r2, r3, r4, r5],   # bucket 1
+    #  [r6, r7, r8, r9, r10],  # bucket 2
+    #  [r11, r12, r13, r14, r15] # bucket 3
+    # ]
+
+   # Example here to understand better: --->
+   # flat_map receives each bucket ONE AT A TIME:
+
+   # iteration 1 → bucket = [r1, r2, r3, r4, r5]
+   # first   = r1
+   # peak_co = Enum.max_by([r1,r2,r3,r4,r5], co_ppm)  # finds peak inside bucket 1 only
+
+   # iteration 2 → bucket = [r6, r7, r8, r9, r10]
+   # first   = r6
+   # peak_co = Enum.max_by([r6,r7,r8,r9,r10], co_ppm) # finds peak inside bucket 2 only
+
+   # iteration 3 → bucket = [r11, r12, r13, r14, r15]
+   # first   = r11
+   # peak_co = Enum.max_by([r11,r12,r13,r14,r15], co_ppm) # finds peak inside bucket 3 only
+   # flat_map and map both iterate item by item. 
+   # The only difference is flat_map flattens the result at the end. 
 
     samples
     |> Enum.chunk_every(bucket_size, bucket_size, :discard)
     |> Enum.map(fn bucket ->
       # We anchor the window with the first point and the most dangerous point (Peak CO)
       first = List.first(bucket)
-      peak_co = Enum.max_by(bucket, & &1.co_ppm)
-
-      [first, peak_co]
+      peak_co = Enum.max_by(bucket, &Map.get(&1, :co_ppm, 0.0))   
+      # Avoid duplicating when first == peak
+      if first == peak_co, do: [first], else: [first, peak_co]
     end)
-    |> List.flatten()
     |> Enum.uniq_by(& &1.timestamp) 
     |> Enum.sort_by(& &1.timestamp, DateTime)
     |> Enum.take(max_points)

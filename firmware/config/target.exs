@@ -76,6 +76,10 @@ config :vintage_net_wizard,
                                  # automatically "pops up" the login window when a 
                                  # device connects to the Nerves WiFi access point.
 
+# configure Nerves Time:
+# Basically, block device startup for 5 seconds waiting for NTP response
+config :nerves_time, await_initialization_timeout: :timer.seconds(5)
+
 # Configure NTP servers for time synchronization
 # These are used by nerves_time to sync system clock
 # You can specify custom servers here (e.g., your own NTP server)
@@ -85,6 +89,8 @@ config :nerves_time, :servers, [
   "1.pool.ntp.org",
   "2.pool.ntp.org",
   "3.pool.ntp.org"
+
+config :gas_sensor, :env, :target  # used in gas_sensor/lib/gas_sensor/timestamp.ex-> Application.get_env
 
   # Regional servers (uncomment for better performance in your region)
   # "0.us.pool.ntp.org",  	# North America

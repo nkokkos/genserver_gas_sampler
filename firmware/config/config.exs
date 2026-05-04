@@ -32,7 +32,6 @@ config :nerves, :firmware, rootfs_overlay: "rootfs_overlay"
 # The Unix Epoch is a standardized starting point for computer time: January 1, 1970, at 00:00:00 UTC.
 # source_date_epoch refers to the Unix Epoch. 
 # It represents the total number of seconds that have elapsed since the "Unix Epoch."
-
 build_timestamp = System.system_time(:second) |> Integer.to_string()
 config :nerves, source_date_epoch: build_timestamp
 # Hardcoded:

@@ -7,8 +7,6 @@ defmodule GasSensor.ReadingAgent do
 
   Only the Sensor GenServer writes here. Phoenix LiveView reads from here.
 
-  Prevents I2C bus contention — web requests never wait for hardware.
-
   ## Usage
 
       # Get current reading (non-blocking, O(1))
@@ -144,19 +142,9 @@ defmodule GasSensor.ReadingAgent do
     # Check time reliability
     {timestamp, reliable?} = GasSensor.Timestamp.now_with_reliability()
 
-    # If offline, use provisional timestamp (build date + monotonic offset)
-    # This gives us unique, chronologically ordered timestamps even when
-    # WiFi/NTP is unavailable
-    final_timestamp =
-      if reliable? do
-        timestamp
-      else
-        GasSensor.Timestamp.provisional_timestamp()
-      end
-
     reading_with_timestamp =
       reading
-      |> Map.put(:timestamp, final_timestamp)
+      |> Map.put(:timestamp, timestamp)
       |> Map.put(:time_reliable, reliable?)
       |> Map.put(:status, status)
   
@@ -164,8 +152,11 @@ defmodule GasSensor.ReadingAgent do
     Agent.update(@agent_name, fn _ -> reading_with_timestamp end)
 
     # Synchronize with History
+    # Use integer Unix ms as ETS key — not the DateTime struct.
+    # See History module for why.
     # We pass the EXACT same map and timestamp to the ETS table
-    GasSensor.History.record_to_ets(final_timestamp, reading_with_timestamp)
+    unix_ms = DateTime.to_unix(timestamp, :millisecond)
+    GasSensor.History.record_to_ets(unix_ms, reading_with_timestamp)
 
     :ok
   end
