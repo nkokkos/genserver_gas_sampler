@@ -1,4 +1,4 @@
-defmodule GasSensor.History do
+defmodule GasSensorWeb.Simulator.History do
   @moduledoc """
 
   ETS-based circular buffer for a maximum 7 days sensor history.
@@ -64,7 +64,7 @@ defmodule GasSensor.History do
   require Logger
 
   # table name used in ETS storage scheme
-  @table_name :sensor_history
+  @table_name :simulated_sensor_history
 
   # 7 days retention
   @retention_seconds		604800 # 7 days in seconds
@@ -300,8 +300,8 @@ defmodule GasSensor.History do
     ]
 
     deleted = :ets.select_delete(@table_name, match_spec)
-    
-    if deleted > 0
+
+    if deleted > 0  do
       Logger.debug("Cleaned up #{deleted} old entries")
     end
 
@@ -370,15 +370,15 @@ defmodule GasSensor.History do
     |> Enum.map(fn bucket ->
       # We anchor the window with the first point and the most dangerous point (Peak CO)
       first = List.first(bucket)
-      peak_co = Enum.max_by(bucket, &Map.get(&1, :co_ppm, 0.0))
-   
+      peak_co = Enum.max_by(bucket, &Map.get(&1, :co_ppm, 0.0))  
+ 
       # Avoid duplicating when first == peak
       if first == peak_co do  
         [first] 
       else 
         [first, peak_co]
       end
-     end)
+    end)
     |> Enum.uniq_by(& &1.timestamp) 
     |> Enum.sort_by(& &1.timestamp, DateTime)
     |> Enum.take(max_points)

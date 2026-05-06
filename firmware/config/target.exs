@@ -181,6 +181,9 @@ config :shoehorn,
   init: [:nerves_runtime, :nerves_pack],
   app: Mix.Project.config()[:app]
 
+# validate firmware if you use mix upload
+config :nerves_pack, validate_firmware: true
+
 # Force the Erlang VM to dump its "Black Box" to the SD card on crash
 config :nerves, :erlinit,
   env: "ERL_CRASH_DUMP=/data/erl_crash.dump"

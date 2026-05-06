@@ -37,8 +37,8 @@ defmodule GasSensorWeb.SensorController do
     reading = GasSensor.ReadingAgent.get_reading()
 
     %{
-      ppm: Map.get(reading, :ppm, 0.0),
-      status: format_status(Map.get(reading, :status, :not_started)),
+      ppm: Map.get(reading, :co_ppm, 0.0),
+      status: format_status(Map.get(reading, :status, :ok)),
       timestamp: Map.get(reading, :timestamp, DateTime.utc_now())
     }
   end

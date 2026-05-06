@@ -44,6 +44,10 @@ defmodule GasSensorWeb.DashboardLive do
       :timer.send_interval(@history_refresh, self(), :update_history)
     end
 
+   # Any key you put inside the assign(socket, ...) function becomes 
+   # available in your HTML template (the .heex file or ~H block) by prefixing it with an 
+   # a @ 
+
     {:ok,
      assign(socket,
        reading: get_reading(),
@@ -72,10 +76,8 @@ defmodule GasSensorWeb.DashboardLive do
     reading = GasSensor.ReadingAgent.get_reading()
 
     %{
-      ppm: Map.get(reading, :ppm, 0.0),
+      ppm: Map.get(reading, :co_ppm, 0.0),
       status: Map.get(reading, :status, :not_started),
-      window: Map.get(reading, :window, []),
-      sample_count: Map.get(reading, :sample_count, 0),
       timestamp: Map.get(reading, :timestamp)
     }
   end
@@ -83,7 +85,7 @@ defmodule GasSensorWeb.DashboardLive do
   # Reads 24-hour history and downsamples for display
   defp get_history do
     GasSensor.History.get_for_graph(@graph_max_points)
-    |> Enum.map(fn %{timestamp: ts, ppm: ppm, status: status} ->
+    |> Enum.map(fn %{timestamp: ts, co_ppm: ppm, status: status} ->
       %{
         time: format_time(ts),
         ppm: ppm,
@@ -137,17 +139,17 @@ defmodule GasSensorWeb.DashboardLive do
             <div class="p-8">
               <div class="flex items-center justify-between mb-8">
                 <div>
-                  <div class={["text-6xl font-bold", get_color_class(@reading.ppm)]}>
-                    <%= Float.round(@reading.ppm, 1) %>
+                  <div class={["text-6xl font-bold", get_color_class(@reading.co_ppm)]}>
+                    <%= Float.round(@reading.co_ppm, 1) %>
                   </div>
                   <div class="text-xl text-gray-500 mt-1">PPM</div>
                 </div>
                 
                 <div class={[
                   "w-24 h-24 rounded-full flex items-center justify-center text-2xl",
-                  get_circle_class(@reading.ppm)
+                  get_circle_class(@reading.co_ppm)
                 ]}>
-                  <%= get_emoji(@reading.ppm) %>
+                  <%= get_emoji(@reading.co_ppm) %>
                 </div>
               </div>
               

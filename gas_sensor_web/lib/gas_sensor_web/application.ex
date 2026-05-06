@@ -17,7 +17,13 @@ defmodule GasSensorWeb.Application do
       {Phoenix.PubSub, name: GasSensorWeb.PubSub},
 
       # Start the Endpoint (http/https)
-      GasSensorWeb.Endpoint
+      GasSensorWeb.Endpoint,
+
+      # Add simulator components
+      GasSensorWeb.Simulator.ReadingAgent,
+      GasSensorWeb.Simulator.History,
+      GasSensorWeb.Simulator.SensorSimulator
+
     ]
 
     opts = [strategy: :one_for_one, name: GasSensorWeb.Supervisor]

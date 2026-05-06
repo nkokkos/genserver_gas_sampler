@@ -15,6 +15,7 @@ config :firmware,
     }
   }
 
+# https://elixirforum.com/t/independent-applications-as-local-dependencies/57109/3
 # these keys will be available to rpi0 or real firmware on a real device
 # Note that temp_path refers to a real path on the rasberry pi zero wireless
 config :gas_sensor,
@@ -22,6 +23,3 @@ config :gas_sensor,
   bme680_module: BMP280,
   temp_path: "/sys/class/thermal/thermal_zone0/temp",
   env: :target #this is for picking the correct time if we are running on rasberry pi. Look inside the GasSensor.Timestamp module
-
-# validate firmware if you use mix upload 
-config :nerves_pack, validate_firmware: true
