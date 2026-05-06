@@ -104,19 +104,4 @@ defmodule GasSensorWeb do
   end
 
 
-  # Add module aliases to simulate the gas_sensor app in the phoenix app
-  defmodule GasSensor do
-    defmodule ReadingAgent do
-      defdelegate get_reading(), to: GasSensorWeb.Simulator.ReadingAgent
-      defdelegate get_ppm(), to: GasSensorWeb.Simulator.ReadingAgent
-      defdelegate get_status(), to: GasSensorWeb.Simulator.ReadingAgent
-      #defdelegate time_reliable?(), to: GasSensorWeb.Simulator.ReadingAgent
-    end
-    
-    defmodule History do
-      defdelegate get_for_graph(max_points), to: GasSensorWeb.Simulator.History
-      defdelegate get_last_24h(), to: GasSensorWeb.Simulator.History
-    end
-  end
-
 end

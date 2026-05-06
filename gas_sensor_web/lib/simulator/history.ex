@@ -39,22 +39,22 @@ defmodule GasSensorWeb.Simulator.History do
   ## Usage
 
       # Note!! Adding samples to the history is done through
-      # GasSensor.ReadingAgent by calling the following function: 
-      # GasSensor.History.record_to_ets(final_timestamp, reading_with_timestamp)
+      # GasSensorWeb.Simulator.ReadingAgent by calling the following function: 
+      # GasSensorWeb.Simulator.History.record_to_ets(final_timestamp, reading_with_timestamp)
       # inside the GasSensor.ReadingAgent.update function
       # Read the GasSensor.ReadingAgent.update function for more.
 
       # Get last 24 hours
-      samples = GasSensor.History.get_last_24h()
+      samples = GasSensorWeb.Simulator.History.get_last_24h()
    
       # Get last 7 days 
-      samples = GasSensor.History.get_last_7_days()
+      samples = GasSensorWeb.Simulator.History.get_last_7_days()
    
       # Get downsampled data for graph (400 points max)
-      graph_data = GasSensor.History.get_for_graph(400)
+      graph_data = GasSensorWeb.Simulator.History.get_for_graph(400)
 
       # Get specific time range
-      range = GasSensor.History.get_range(
+      range = GasSensorWeb.Simulator.History.get_range(
         DateTime.add(DateTime.utc_now(), -1, :hour),
         DateTime.utc_now()
       )
@@ -86,7 +86,7 @@ defmodule GasSensorWeb.Simulator.History do
 
   @doc """
   Records a reading directly into the ETS table.
-  Called by GasSensor.ReadingAgent.
+  Called by GasSensorWeb.Simulator.ReadingAgent.
   """
   def record_to_ets(timestamp, reading) do
     unix_ts = DateTime.to_unix(timestamp, :millisecond)
@@ -106,7 +106,8 @@ defmodule GasSensorWeb.Simulator.History do
   """
   def get_last_24h do
     # Use reliable timestamp (handles Pi Zero W without RTC)
-    cutoff = DateTime.add(GasSensor.Timestamp.now(), -@retention_seconds_24h)
+    {now, _reliable?} = GasSensorWeb.Simulator.Timestamp.now()
+    cutoff = DateTime.add(now, -@retention_seconds_24h, :second)
     get_since(cutoff)
   end
 
@@ -115,19 +116,10 @@ defmodule GasSensorWeb.Simulator.History do
   """
   def get_last_7_days do 
    # Use reliable timestamp (handles Pi Zero W without RTC)
-   cutoff = DateTime.add(GasSensor.Timestamp.now(), -@retention_seconds)
+   cutoff = DateTime.add(GasSensorWeb.Simulator.Timestamp.now(), -@retention_seconds, :second)
    get_since(cutoff)
   end
 
-  @doc """
-  Gets samples since a specific time.
-
-  ## Examples
-
-      # Last hour
-      one_hour_ago = DateTime.add(DateTime.utc_now(), -3600)
-      samples = Core.History.get_since(one_hour_ago)
-  """
   def get_since(%DateTime{} = datetime) do
     
     # Match spec for a 2-element tuple: {timestamp, reading_map}
@@ -163,27 +155,6 @@ defmodule GasSensorWeb.Simulator.History do
   end
 
 
-  @doc """
-  Gets samples for graphing with automatic downsampling.
-
-  Returns at most `max_points` samples by using min-max downsampling
-  The best algorithm would be LTTB - Largest Triangle Three Buckets algorithm for visual accuracy.
-  But it requires a strong cpu and the rasberry pi is not that strong
-   
-
-  ## Parameters
-
-    * `max_points` - Maximum number of points to return (default: 400 for 24 hours)
-
-  ## Examples
-
-      # Get 24h history downsampled to 400 points for graph
-      data = GasSensor.History.get_for_graph(400)
-
-      # Get 7 days history downsampled for 300 points for graph
-      data = GasSensor.History.get_for_7_days_graph()
-     
-  """
   def get_for_graph(max_points \\ @max_samples_for_graph) do
     samples = get_last_24h()
     downsample(samples, max_points)
@@ -194,9 +165,6 @@ defmodule GasSensorWeb.Simulator.History do
     downsample(samples, max_points)
   end
 
-  @doc """
-  Gets the oldest sample in the history.
-  """
   def get_oldest do
     # :ets.first returns the very first key in the :ordered_set (the newest time)
     case :ets.first(@table_name) do
@@ -287,7 +255,8 @@ defmodule GasSensorWeb.Simulator.History do
 
   defp cleanup_old_entries do
     # Calculate the "Expiration Date"
-    cutoff = DateTime.add(GasSensor.Timestamp.now(), -@retention_seconds)
+    {now, _reliable?} = GasSensorWeb.Simulator.Timestamp.now()
+    cutoff = DateTime.add(now, -@retention_seconds, :second)
 
     # match_spec for 2-element tuple: {timestamp, reading_map}
     # $1 = timestamp, $2 = map

@@ -56,14 +56,7 @@ defmodule GasSensorWeb.Simulator.ReadingAgent do
     Agent.start_link(fn -> @default_reading end, name: @agent_name)
   end
 
-  @doc """
-  Gets the current reading from the Agent.
 
-  Returns the full reading map
-
-  ## Examples
-      iex> GasSensor.ReadingAgent.get_reading()
-  """
   def get_reading do
     Agent.get(@agent_name, & &1)
   end

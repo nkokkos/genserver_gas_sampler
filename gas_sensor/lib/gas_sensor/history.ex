@@ -106,7 +106,8 @@ defmodule GasSensor.History do
   """
   def get_last_24h do
     # Use reliable timestamp (handles Pi Zero W without RTC)
-    cutoff = DateTime.add(GasSensor.Timestamp.now(), -@retention_seconds_24h)
+    {now, _reliable?} = GasSensorWeb.Simulator.Timestamp.now()
+    cutoff = DateTime.add(now, -@retention_seconds_24h)
     get_since(cutoff)
   end
 
@@ -115,7 +116,8 @@ defmodule GasSensor.History do
   """
   def get_last_7_days do 
    # Use reliable timestamp (handles Pi Zero W without RTC)
-   cutoff = DateTime.add(GasSensor.Timestamp.now(), -@retention_seconds)
+   {now, _reliable?} = GasSensorWeb.Simulator.Timestamp.now()
+   cutoff = DateTime.add(now, -@retention_seconds)
    get_since(cutoff)
   end
 
@@ -287,7 +289,8 @@ defmodule GasSensor.History do
 
   defp cleanup_old_entries do
     # Calculate the "Expiration Date"
-    cutoff = DateTime.add(GasSensor.Timestamp.now(), -@retention_seconds)
+    {now, _reliable?} = GasSensorWeb.Simulator.Timestamp.now()
+    cutoff = DateTime.add(now, -@retention_seconds, :second)
 
     # match_spec for 2-element tuple: {timestamp, reading_map}
     # $1 = timestamp, $2 = map
