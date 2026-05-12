@@ -1,7 +1,6 @@
-defmodule GasSensorWeb.SensorDetailLive do
+defmodule GasSensorWeb.SensorHistoryLive do
   @moduledoc """
-  TGS5042 CO sensor real-time monitor with 5-minute history.
-  Polls Agent every 1s for current reading, ETS every 5s for graph.
+  Just 2 hours history & 24 hours history
   """
   use GasSensorWeb, :live_view
 
@@ -19,9 +18,10 @@ defmodule GasSensorWeb.SensorDetailLive do
 
     {:ok,
      socket
-     |> assign(:current, get_current())
-     |> assign(:history, get_history())
-     |> assign(:history_1_minute, get_history_1_minute())
+     #|> assign(:current, get_current())
+     #|> assign(:history, get_history())
+     #|> assign(:history_1_minute, get_history_1_minute())
+     |> assign(:history_2_hours, get_last_2_hours())
      |> assign(:connected, connected?(socket))}
   end
 
@@ -44,18 +44,27 @@ defmodule GasSensorWeb.SensorDetailLive do
   defp get_current do
     GasSensor.ReadingAgent.get_reading()
   end
-
-
-  defp get_history_24h do 
-
-  end
-
-  defp get_history_7_days do 
+  
+  # should show CO, temperature, humidity 
+  defp get_last_2_hours do
+    {now, _} = GasSensor.Timestamp.now_with_reliability()
+    cutoff = DateTime.add(now, -7200, :second)
+    
+    GasSensor.History.get_since(cutoff)
+    |> Enum.map(fn reading ->
+      %{
+        time: reading.timestamp_iso,
+        co_ppm: reading.co_ppm,
+        temperature: reading.temperature_c,
+	humidity: reading.humidity_rh,
+      }
+    end)
   
   end
 
-
- 
+  defp get_history_7_days_graph do 
+  
+  end
 
   defp get_history do
     {now, _} = GasSensor.Timestamp.now_with_reliability()
@@ -112,9 +121,9 @@ defmodule GasSensorWeb.SensorDetailLive do
 			
 							
 								<nav class="flex-1 px-4 space-y-2">
-				  <!-- 1. active (No border, no background) -->
-				  <.link navigate={~p"/sensor/detail"} class="flex items-center gap-3 px-4 py-3 text-white bg-indigo-600 
-					rounded-xl shadow-lg shadow-indigo-500/20 transition group">
+				  <!-- 1. inactive (No border, no background) -->
+				  <.link navigate={~p"/sensor/detail"} class="flex items-center gap-3 px-4 py-3 
+					text-slate-400 rounded-xl hover:bg-white/5 hover:text-white transition group">
 					<span class="font-medium">Live Monitor CO - TEMP </span>
 				  </.link>
 				  
@@ -123,7 +132,13 @@ defmodule GasSensorWeb.SensorDetailLive do
 					text-slate-400 rounded-xl hover:bg-white/5 hover:text-white transition group">
 					<span class="font-medium">Sensor PPM vs Volts</span>
 				  </.link>
-					
+				   
+				   <!-- active (Solid background, white text) -->
+				  <.link navigate={~p"/sensor/history"} class="flex items-center gap-3 px-4 py-3 text-white bg-indigo-600 
+					rounded-xl shadow-lg shadow-indigo-500/20 transition group">
+					<span class="font-medium">Sensor Config</span>
+				  </.link>
+				  
 				  <!-- inactive (Solid background, white text) -->
 				  <.link navigate={~p"/sensor/offset"} class="flex items-center gap-3 px-4 py-3 
 					text-slate-400 rounded-xl hover:bg-white/5 hover:text-white transition group">
@@ -167,57 +182,9 @@ defmodule GasSensorWeb.SensorDetailLive do
 			  <!-- Current Readings -->
 			  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
 				<!-- CO Card -->
-				<div class="relative group">
-				  <div class="absolute -inset-0.5 bg-gradient-to-r from-red-600 to-pink-600 rounded-2xl blur opacity-75 group-hover:opacity-100 transition"></div>
-				  <div class="relative bg-slate-800 rounded-2xl p-8 h-full">
-					<div class="flex items-center justify-between mb-6">
-					  <h2 class="text-white text-xl font-semibold">Carbon Monoxide</h2>
-					  <div class="text-4xl">💨</div>
-					</div>
-					<div class="flex items-end justify-between">
-					  <div>
-						<div class={["text-7xl font-black mb-2", elem(get_co_status(@current.co_ppm), 2)]}>
-						  <%= Float.round(@current.co_ppm, 1) %>
-						</div>
-						<div class="text-2xl text-gray-400">PPM</div>
-					  </div>
-					  <div class={[
-						"px-4 py-2 rounded-full text-sm font-bold",
-						case get_co_status(@current.co_ppm) do
-						  {:safe, _, _} -> "bg-green-500 text-white"
-						  {:moderate, _, _} -> "bg-yellow-500 text-white"
-						  {:high, _, _} -> "bg-red-500 text-white animate-pulse"
-						end
-					  ]}>
-						<%= elem(get_co_status(@current.co_ppm), 1) %>
-					  </div>
-					</div>
-				  </div>
-				</div>
 				
-				<!-- Temperature Card -->
-				<div class="relative group">
-				  <div class="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl blur opacity-75 group-hover:opacity-100 transition"></div>
-				  <div class="relative bg-slate-800 rounded-2xl p-8 h-full">
-					<div class="flex items-center justify-between mb-6">
-					  <h2 class="text-white text-xl font-semibold">Temperature</h2>
-					  <div class="text-4xl">🌡️</div>
-					</div>
-					<div class="flex items-end justify-between">
-					  <div>
-						<div class={["text-7xl font-black mb-2", get_temp_class(@current.temperature_c)]}>
-						  <%= Float.round(@current.temperature_c, 1) %>
-						</div>
-						<div class="text-2xl text-gray-400">°C</div>
-					  </div>
-					  <div class="text-right text-gray-300 text-sm">
-					  <!--	<div><%#= Float.round(@current.temperature_c * 9/5 + 32, 1) %>°F</div> -->
-						<div class="text-3xl text-gray-500 mt-10">RH: <%= Float.round(@current.humidity_rh, 1) %>%</div>
-						<div class="text-3xl text-gray-500">Dew: <%= Float.round(@current.dew_point_c, 1) %>°C</div>
-					  </div>
-					</div>
-				  </div>
-				</div>
+				
+				
 			  </div>
 			  
 			  			  <!-- Chart Section -->
@@ -228,7 +195,7 @@ defmodule GasSensorWeb.SensorDetailLive do
 					<div>
 					  <h2 class="text-white text-2xl font-bold">1 Minute Trend</h2>
 					  <p class="text-purple-300 text-sm mt-1">
-						<%= length(@history_1_minute) %> data points • Updates every 5s
+						<%= length(@history_2_hours) %> data points 
 					  </p>
 					</div>
 					<div class="flex gap-4 text-sm">
@@ -243,16 +210,16 @@ defmodule GasSensorWeb.SensorDetailLive do
 					</div>
 				  </div>
 				  <div class="bg-slate-900 rounded-xl p-6">
-					<div style="height: 550px; position: relative; width: 100%;">
+					<div style="height: 620px; position: relative; width: 100%;">
 					  <canvas 
 						 id="sensorChart" 
-						 phx-hook="SensorChart" 
-						 class={if length(@history_1_minute) == 0, do: "hidden", else: ""}
-						 data-history={Jason.encode!(@history_1_minute)} 
+						 phx-hook="SensorChartHistory_2Hours" 
+						 class={if length(@history_2_hours) == 0, do: "hidden", else: ""}
+						 data-history-hours2={Jason.encode!(@history_2_hours)} 
 						 phx-update="ignore">
 					   </canvas>
 					 </div>
-					 <%= if length(@history_1_minute) == 0 do %>
+					 <%= if length(@history_2_hours) == 0 do %>
 					   <div class="text-center py-12 text-gray-400">
 						 <p class="text-lg">📊 Collecting data...</p>
 					   </div>
@@ -262,46 +229,6 @@ defmodule GasSensorWeb.SensorDetailLive do
 			  </div>
 			  
 				
-			  <!-- Chart Section -->
-			  <div class="relative group mb-12">
-				<div class="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl blur opacity-50"></div>
-				<div class="relative bg-slate-800 rounded-2xl p-8">
-				  <div class="flex items-center justify-between mb-6">
-					<div>
-					  <h2 class="text-white text-2xl font-bold">5-Minute Trend</h2>
-					  <p class="text-purple-300 text-sm mt-1">
-						<%= length(@history) %> data points • Updates every 5s
-					  </p>
-					</div>
-					<div class="flex gap-4 text-sm">
-					  <div class="flex items-center gap-2">
-						<div class="w-4 h-1 bg-red-500 rounded"></div>
-						<span class="text-gray-300">CO PPM</span>
-					  </div>
-					  <div class="flex items-center gap-2">
-						<div class="w-4 h-1 bg-blue-500 rounded"></div>
-						<span class="text-gray-300">Temp</span>
-					  </div>
-					</div>
-				  </div>
-				  <div class="bg-slate-900 rounded-xl p-6">
-					<div style="height: 550px; position: relative; width: 100%;">
-					  <canvas 
-						 id="sensorChart" 
-						 phx-hook="SensorChart" 
-						 class={if length(@history) == 0, do: "hidden", else: ""}
-						 data-history={Jason.encode!(@history)} 
-						 phx-update="ignore">
-					   </canvas>
-					 </div>
-					 <%= if length(@history) == 0 do %>
-					   <div class="text-center py-12 text-gray-400">
-						 <p class="text-lg">📊 Collecting data...</p>
-					   </div>
-					 <% end %>
-				  </div>
-				</div>
-			  </div>
 				
 			  <!-- Safety Reference -->
 			  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">

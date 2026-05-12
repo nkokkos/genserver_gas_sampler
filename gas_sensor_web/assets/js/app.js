@@ -172,6 +172,103 @@ Hooks.SensorChart_volts = {
     // 'none' prevents the chart from bouncing/animating on every tick
     this.chart.update('none');
   }
+};
+
+Hooks.SensorChartHistory_2Hours = {
+  // Runs once when the page/canvas loads
+  mounted() {
+    const ctx = this.el.getContext('2d');
+    const data = JSON.parse(this.el.dataset.historyHours2);
+
+    this.chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.map(d => d.time),
+        datasets: [
+          {
+            label: 'CO (PPM)',
+            data: data.map(d => d.co_ppm),
+            borderColor: '#ef4444', // Red
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            yAxisID: 'y',
+            borderWidth: 3,
+            tension: 0.4,
+            fill: true
+          },
+          {
+            label: 'Temperature',
+            data: data.map(d => d.temperature_c),
+            borderColor: '#3b82f6', // Blue
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            yAxisID: 'y1',
+            borderWidth: 3,
+            tension: 0.4,
+            fill: true
+          },
+          {
+            label: 'Humidity',
+            data: data.map(d => d.humidity_rh),
+            borderColor: '#10b981', // Green (Distinguishable from Temp)
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            yAxisID: 'y1',
+            borderWidth: 3,
+            tension: 0.4,
+            fill: true
+          } 
+        ]
+      },
+      options: {
+	animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+	scales: {
+          y: { 
+            type: 'linear', 
+            beginAtZero: true,
+            position: 'left',
+            title: { display: true, text: 'CO ppm' } 
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            title: { display: true, text: 'Temp / Humidity' },
+            // Grid lines on the right axis can make the chart look messy
+            grid: { drawOnChartArea: false } 
+          }
+        //scales:
+	//{
+          // Removed y1 axis
+        //  y: { 
+        //    type: 'linear', 
+        //    position: 'left', 
+        //    beginAtZero: true,
+        //    title: { display: true, text: 'Consolidated Scale' } 
+        //  }
+        }
+        //scales: {
+        //  y: { type: 'linear', position: 'left', title: { display: true, text: 'PPM' } },
+        //  y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false } }
+        //}
+      }
+    });
+  },
+
+  // THIS IS THE UPDATED FUNCTION
+  // It runs every 5 seconds when the server sends new @history
+  updated() {
+    const data = JSON.parse(this.el.dataset.historyHours2);
+    
+    // Update labels (time)
+    this.chart.data.labels = data.map(d => d.time);
+    
+    // Update both lines
+    this.chart.data.datasets[0].data = data.map(d => d.co_ppm);
+    this.chart.data.datasets[1].data = data.map(d => d.temperature_c);
+    this.chart.data.datasets[2].data = data.map(d => d.humidity_rh);
+    // 'none' prevents the chart from bouncing/animating on every tick
+    this.chart.update('none');
+  }
 }
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")

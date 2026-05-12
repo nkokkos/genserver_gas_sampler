@@ -2,23 +2,28 @@ defmodule GasSensorWeb.VsensoroffsetLive do
   use GasSensorWeb, :live_view
 
   def mount(_params, _session, socket) do 
-    #vsensor_offset = GasSensor.ReadingAgent.get_vsensor_offset()
-    vsensor_offset = 1.0
+    
+	#vsensor_offset = GasSensor.ReadingAgent.get_vsensor_offset()
+    #vsensor_offset = 1.0
+	
+	vsensor_offset_value = GasSensor.ConfigManager.get_vsensor_offset()
+	
 	{:ok, 
     socket
-    |> assign(:vsensor_offset, 1.0) # Your existing assign
+    |> assign(:vsensor_offset, vsensor_offset_value) # Your existing assign
     |> assign(:error, nil)          # Your existing assign
     |> assign(:connected, connected?(socket)) # ADD THIS LINE
   }
   end
 
-  def handle_event("update", %{"vsensor_offset" => value}, socket) do 
+  def handle_event("save_settings", %{"vsensor_offset" => value}, socket) do 
     case parse_and_validate(value) do 
-      {:ok, vsensor_offset} ->
-        GasSensor.ConfigManager.save_vsensor_offset(vsensor_offset)
-        #GasSensor.ReadingAgent.update_vsensor_offset(vsensor_offset)
-        {:noreply, assign(socket, vsensor_offset: vsensor_offset, error: nil)}
-
+      {:ok, value} ->
+        GasSensor.ConfigManager.save_vsensor_offset(value)
+        GasSensor.ReadingAgent.update_vsensor_offset(value)
+		{:noreply, assign(socket, vsensor_offset: value, error: nil)}
+		{:noreply, push_event(socket, "force-reload", %{})}
+		 
       {:error, message} ->
         {:noreply, assign(socket, error: message)}
     end
@@ -60,9 +65,14 @@ defmodule GasSensorWeb.VsensoroffsetLive do
 								text-slate-400 rounded-xl hover:bg-white/5 hover:text-white transition group">
 								<span class="font-medium">Sensor PPM vs Volts</span>
 							  </.link>
+							  
+							  	<.link navigate={~p"/sensor/history"} class="flex items-center gap-3 px-4 py-3 
+								text-slate-400 rounded-xl hover:bg-white/5 hover:text-white transition group">
+								<span class="font-medium">Sensor Config</span>
+								</.link>
 								
 							  <!-- 3. ACTIVE (Solid background, white text) -->
-							  <.link navigate={~p"/vsensor/offset"} class="flex items-center gap-3 px-4 py-3 text-white bg-indigo-600 
+							  <.link navigate={~p"/sensor/offset"} class="flex items-center gap-3 px-4 py-3 text-white bg-indigo-600 
 								rounded-xl shadow-lg shadow-indigo-500/20 transition group">
 								<span class="font-medium">Sensor Config</span>
 							  </.link>
@@ -101,9 +111,13 @@ defmodule GasSensorWeb.VsensoroffsetLive do
 							  
 							  <div class="relative bg-slate-900/80 backdrop-blur-xl rounded-2xl p-8 border border-white/10">
 								<h2 class="text-white text-2xl font-bold mb-6 flex items-center gap-2">
-								  <span>⚙️</span> Sensor Configuration
+								  <span>⚙️</span> Sensor Configuration / Voltage Offset (V)
 								</h2>
-
+							     <%= if flash = Phoenix.Flash.get(@flash, :info) do %>
+								   <div class="block text-lg font-medium text-purple-200 mb-2">
+									 
+									</div>
+									<% end %>
 								<form phx-submit="save_settings" class="space-y-6">
 								  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -120,6 +134,15 @@ defmodule GasSensorWeb.VsensoroffsetLive do
 									   class="w-full bg-slate-950/50 border border-white/10 text-white rounded-xl focus:ring-2 focus:ring-indigo-500 
 									   focus:border-transparent p-5 text-xl transition" 
 										>
+										
+										<%= if @error do %>
+									      <p class="mt-2 text-sm text-red-400"><%= @error %></p>
+										<% end %>
+																	     <%= if flash = Phoenix.Flash.get(@flash, :info) do %>
+								   <div class="block text-lg font-medium text-purple-200 mb-2">
+									 Ok, έγινε η αποθήκευση
+									</div>
+									<% end %>
 									</div>
 								  </div>
 
@@ -127,7 +150,7 @@ defmodule GasSensorWeb.VsensoroffsetLive do
 								  <!-- Action Button -->
 								  <button type="submit" 
 									class="w-full py-3 px-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/25 transition-all transform active:scale-[0.98]">
-									Update Configuration
+									Save Offset
 								  </button>
 								</form>
 

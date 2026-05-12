@@ -23,6 +23,7 @@ defmodule GasSensorWeb.Router do
     #live("/", DashboardLive, :index)
     #live("/sensor", SensorLive, :index)
   
+    # root to 
     live "/", SensorDetailLive, :index
 
     # set up the new graph
@@ -30,8 +31,8 @@ defmodule GasSensorWeb.Router do
 
     # set up the configuration page for vsensor offset
     live("/sensor/offset", VsensoroffsetLive, :index)    
-
     live("/sensor/volts", SensorVoltsLive, :index)
+    live("/sensor/history", SensorHistoryLive, :index)
   end
 
   # API endpoint for sensor data (optional)
