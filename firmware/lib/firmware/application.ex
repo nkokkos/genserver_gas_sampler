@@ -90,11 +90,11 @@ defmodule Firmware.Application do
     children = [
       
       # start the Delux genserver      
-      #{Delux, [
-      #  name: Delux,
-      #  indicators: %{status: %{green: "ACT"}},
-      #  initial: %{status: Delux.Effects.blink(:on, 5)}
-      #]},
+      {Delux, [
+        name: Delux,
+        indicators: %{status: %{green: "ACT"}},
+        initial: %{status: Delux.Effects.blink(:on, 5)}
+      ]},
 
       # Load the VintageNetWizard Genserver using the child spec:
       %{
@@ -104,6 +104,7 @@ defmodule Firmware.Application do
         restart: :permanent,                     # Restart it if it crashes
         shutdown: 500                            # Give it 500ms to clean up on exit
       },
+
       # Load the dummy genserver:
       %{
         id: Firmware.Dummy, # A unique name for the supervisor to track
@@ -122,7 +123,7 @@ defmodule Firmware.Application do
   case Supervisor.start_link(children, opts) do
     {:ok, pid} ->
       # Force a refresh just in case the init-blink was missed
-      #Delux.render(%{status: Delux.Effects.blink(:on, 5)})
+      Delux.render(%{status: Delux.Effects.blink(:on, 1)})
       {:ok, pid}
 
     {:error, reason} ->

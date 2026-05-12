@@ -60,7 +60,7 @@ defmodule GasSensorWeb.MixProject do
       # This line must be removed when you compile firmware
       # this only exists, if you need to have access to methods
       # in gas_sensor from this ui app.
-      {:gas_sensor, path: "../gas_sensor", runtime: true},
+      # {:gas_sensor, path: "../gas_sensor", runtime: true},
       
       # Only for development
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},

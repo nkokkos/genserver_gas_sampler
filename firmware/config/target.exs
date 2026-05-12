@@ -7,7 +7,7 @@ import Config
 config :ui, UiWeb.Endpoint,
   #url: [host: "nerves.local"],
   url: [host: "0.0.0.0"],
-  http: [port: 80],
+  http: [port: 8081],
   cache_static_manifest: "priv/static/cache_manifest.json",
   secret_key_base: "UPDATE_THIS_SECRET_KEY_BASE",
   live_view: [signing_salt: "UPDATE_THIS_SIGNING_SALT"],
@@ -185,9 +185,6 @@ config :mdns_lite,
 config :shoehorn,
   init: [:nerves_runtime, :nerves_pack],
   app: Mix.Project.config()[:app]
-
-# validate firmware if you use mix upload
-config :nerves_pack, validate_firmware: true
 
 # Force the Erlang VM to dump its "Black Box" to the SD card on crash
 config :nerves, :erlinit,

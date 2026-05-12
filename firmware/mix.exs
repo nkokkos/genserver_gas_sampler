@@ -2,7 +2,7 @@ defmodule Firmware.MixProject do
   use Mix.Project
 
   @app :firmware
-  @version "0.1.2"
+  @version "0.2.0"
 
   # Include all targets
   @all_targets [
@@ -88,7 +88,7 @@ defmodule Firmware.MixProject do
       # add blinky dependency so it always flashes while the app is up
       # https://github.com/nerves-project/nerves_examples/tree/main/blinky
       # Look into the application.ex to see how it is used
-      {:delux, "~> 0.4.1", targets: :rpi0},
+      {:delux, "~> 0.4.1", targets: @all_targets},
       
       # Use the json parser 
       {:jason, "~> 1.4"},
@@ -118,7 +118,7 @@ defmodule Firmware.MixProject do
       # Phoenix web interface that sports a simple web page that displays
       # data in live view. Don't start it automatically when the firmware boots
 
-      {:gas_sensor_web, path: "../gas_sensor_web", runtime: false, targets: @all_targets},
+      #{:gas_sensor_web, path: "../gas_sensor_web", runtime: false, targets: @all_targets},
     
     ]
   end

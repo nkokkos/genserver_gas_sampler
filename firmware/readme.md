@@ -1,14 +1,17 @@
 # Elixir Nerves commands 
-
+``
 Application.started_applications
 top()
 cmd("free") or :erlang.memory()
 VintageNet.info()
 VintageNet.all_interfaces()
+```
 
 # Check all environment in the firmare:
+```
 Application.get_all_env(:firmware)
- 
+ ```
+
 # Supervisor
 example:
 Supervisor.which_children(GasSensor.Supervisor)
@@ -86,4 +89,5 @@ lsblk
 # Burn (replace /dev/sdX)
 mix firmware.burn /dev/sdX
 
-
+# Check for firmware version on boot
+Nerves.Runtime.KV.get_active("nerves_fw_version")

@@ -120,7 +120,7 @@ defmodule GasSensor.Application do
       # Finally, start GasSensor - only process that touches I2C
       # Depends on ReadingAgent and History (must start after)
       # Pass I2C bus configuration from app config
-      # { GasSensor.Sensor, [i2c_bus: i2c_bus] }
+      { GasSensor.Sensor, [i2c_bus: i2c_bus] }
     ]
 
     opts = [strategy: :one_for_one, name: GasSensor.Supervisor]

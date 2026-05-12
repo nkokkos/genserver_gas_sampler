@@ -1,16 +1,10 @@
-## Optimized erlang/kernel settings since we 
-## are running on an old rasberry pi zero wireless of
-# 2017 production
+## Customize flags given to the VM: https://www.erlang.org/doc/apps/erts/erl_cmd.html
 
-## Node name for Livebook/Observer access
--name sampler@tgs5042.local
+## Do not set -name or -sname here. Prefer configuring them at runtime
+## Configure -setcookie in the mix.exs release section or at runtime
 
-## Cookie for distributed Erlang
--setcookie tgs5042_demo_2026
-
-## Heart watchdog for auto-restart
--heart
--env HEART_BEAT_TIMEOUT 60
+## Number of dirty schedulers doing IO work (file, sockets, and others)
++SDio 5
 
 ## Single scheduler (My Pi Zero has 1 core)
 +S 1:1
@@ -19,47 +13,73 @@
 +A 10
 
 ## Dirty schedulers for I2C (sensors + Nerves Key crypto)
-+SDio 2:2
-+SDcpu 1:1
+## +SDio 2:2
+## +SDcpu 1:1
 
-## Disable busy waiting (save power)
+## Increase number of concurrent ports/sockets
++Q 65536
+
+## Tweak GC to run more often
+-env ERL_FULLSWEEP_AFTER 10
+
+## Use Ctrl-C to interrupt the current shell rather than invoking the emulator's
+## break handler and possibly exiting the VM.
++Bc
+
+# Allow time warps so that the Erlang system time can more closely match the
+# OS system time.
++C multi_time_warp
+
+## Choose whether to load all code at system startup
+## See https://www.erlang.org/doc/system/system_principles.html#code-loading-strategy
+## Slow devices sometimes benefit from choosing embedded mode
+##-mode interactive
+
+# Load code as per the boot script since not using archives
+# See https://www.erlang.org/doc/man/init.html#command-line-flags
+-code_path_choice strict
+
+## Disable scheduler busy wait to reduce idle CPU usage and avoid delaying
+## other OS processes. See https://www.erlang.org/doc/apps/erts/erl_cmd.html#+sbwt
 +sbwt none
-+swt very_low
++sbwtdcpu none
++sbwtdio none
 
-## Memory allocator for embedded
-+MBas aobf
-+MBacul 0
+## Save the shell history between reboots
+## See https://www.erlang.org/doc/apps/kernel/kernel_app for additional options
+-kernel shell_history enabled
 
-## ETS allocator - critical for 7 days of data storage
-+MEas aobf
-+MElmbcs 4096
-+MElmcs 2048
-+MEsmcs 2048
+## Enable heartbeat monitoring of the Erlang runtime system
+-heart -env HEART_BEAT_TIMEOUT 30
 
-## Process limits (MQTT client + Phoenix + background tasks)
-+P 131072
+## Start the Elixir shell
 
-## Atom limit
-+t 1500000
+-noshell
+-user elixir
+-run elixir start_cli
 
-## Unicode support
-+pc unicode
-
-## Time correction (critical for accurate timestamps)
-+c true
-+C no_time_warp
+## Enable colors in the shell
+-elixir ansi_enabled true
 
 ## Distribution ports for Livebook
-## In case you don't need Livebook 
+## In case you don't need Livebook
 ## remove the following lines
--kernel inet_dist_listen_min 4370
--kernel inet_dist_listen_max 4370
--kernel inet_dist_use_interface {0,0,0,0}
+##-kernel inet_dist_listen_min 4370
+##-kernel inet_dist_listen_max 4370
+##-kernel inet_dist_use_interface {0,0,0,0}
 
 ## TCP tuning for LiveView + ThingsBoard
--kernel inet_default_connect_options [{nodelay,true},{keepalive,true}]
--kernel inet_default_listen_options [{nodelay,true},{sndbuf,32768},{recbuf,8192}]
+##-kernel inet_default_connect_options [{nodelay,true},{keepalive,true}]
+##-kernel inet_default_listen_options [{nodelay,true},{sndbuf,32768},{recbuf,8192}]
 
 ## SSL/TLS tuning for ThingsBoard (if using HTTPS/MQTTS)
--ssl session_lifetime 300
--ssl session_cache_client_max 100
+##-ssl session_lifetime 300
+##-ssl session_cache_client_max 100
+
+## Options added after -extra are interpreted as plain arguments and can be
+## retrieved using :init.get_plain_arguments(). Options before the "--" are
+## interpreted by Elixir and anything afterwards is left around for other IEx
+## and user applications.
+-extra --no-halt
+--
+--dot-iex /etc/iex.exs
