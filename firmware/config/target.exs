@@ -4,35 +4,6 @@ import Config
 # See https://hexdocs.pm/ring_logger/readme.html for more information on
 # configuring ring_logger.
 
-config :gas_sensor_web, GasSensorWeb.Endpoint,
-  url: [host: "tgs5042.local"],
-  http: [port: 3001],
-  http: [ip: {0,0,0,0}, port: 3001]
-  cache_static_manifest: "priv/static/cache_manifest.json",
-  secret_key_base: "im2VAbnBXgHTrb6tJQzsS7w84jbfiMQ6A3jamHvnYiOR10y43E2hcoostekTHXVe",
-  live_view: [signing_salt: "AqXWegTmfeVLuFlZFwnfUYz4c5WZur1VwzjgLKw/xgGGSEVGiLz3ZS4BqTYqdx3a"],
-  check_origin: false,
-  # Start the server since we're running in a release instead of through `mix`
-  server: true,
-  render_errors: [view: UiWeb.ErrorView, accepts: ~w(html json), layout: false],
-  pubsub_server: GasSensorWeb.PubSub,
-  # Nerves root filesystem is read-only, so disable the code reloader
-  code_reloader: false,
-  check_origin: false,
-  adapter: Bandit.PhoenixAdapter
-
-# Do not include metadata nor timestamps in development logs
-config :logger, :console, format: "[$level] $message\n"
-
-# Set a higher stacktrace during development
-config :phoenix, :stacktrace_depth, 20
-
-# Initialize plugs at runtime for faster development compilation
-config :phoenix, :plug_init_mode, :runtime
-
-# Include HEEx debug annotations as HTML comments in rendered markup
-config :phoenix_live_view, :debug_heex_annotations, true
-
 config :logger, backends: [RingLogger]
 
 # Save messages to one circular buffer that holds 1024 entries.

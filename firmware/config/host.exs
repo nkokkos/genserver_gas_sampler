@@ -26,7 +26,7 @@ config :gas_sensor_web, GasSensorWeb.Endpoint,
   check_origin: false,
   # Start the server since we're running in a release instead of through `mix`
   server: true,
-  render_errors: [view: UiWeb.ErrorView, accepts: ~w(html json), layout: false],
+  render_errors: [view: GasSensorWeb.ErrorView, accepts: ~w(html json), layout: false],
   pubsub_server: GasSensorWeb.PubSub,
   # Nerves root filesystem is read-only, so disable the code reloader
   code_reloader: false,
@@ -34,19 +34,21 @@ config :gas_sensor_web, GasSensorWeb.Endpoint,
   adapter: Bandit.PhoenixAdapter
 
 # Do not include metadata nor timestamps in development logs
-config :logger, :console, format: "[$level] $message\n"
+#config :logger, :console, format: "[$level] $message\n"
 
 # Set a higher stacktrace during development
-config :phoenix, :stacktrace_depth, 20
+
+#config :phoenix, :stacktrace_depth, 20
 
 # Initialize plugs at runtime for faster development compilation
-config :phoenix, :plug_init_mode, :runtime
+#config :phoenix, :plug_init_mode, :runtime
 
 # Include HEEx debug annotations as HTML comments in rendered markup
-config :phoenix_live_view, :debug_heex_annotations, true
+#config :phoenix_live_view, :debug_heex_annotations, true
+
+
 
 config :logger, backends: [RingLogger]
-
 
 config :nerves_runtime,
   kv_backend:

@@ -248,7 +248,9 @@ defmodule GasSensor.Sensor do
     result = 
 
        with {:ok, bme680_data } <- BMP280.measure(:bme680),
+            _                   <- Process.sleep(1000),
             {:ok, cpu_temp }    <- GasSensor.HardwareTemp.read_cpu_temp(),
+            _                   <- Process.sleep(1000),
             {:ok, samples}      <- collect_samples(state.i2c, @number_of_samples) 
        do
         
@@ -268,7 +270,17 @@ defmodule GasSensor.Sensor do
                                    bme680_data.temperature_c, 
                                    state.vsensor_offset) 
 
-         # Update the state with all the data
+         # Update the state with all the data, except the 
+         # vsensor_offset, which is a default value of 1.0 and then 
+         # changed from the settings menu.
+          
+         # The vsensor_offset value should be set to the value of
+         # differential at 0 CO ppm at the settings menu.
+
+         # That is, from the liveview page, at 0 CO ppm, read the 
+         # differential and set vsensor_offset = differential at the settings 
+         # menu
+
          new_state = %{ state |
            co_ppm: final_ppm,
            temperature_c: bme680_data.temperature_c,
@@ -349,12 +361,15 @@ defmodule GasSensor.Sensor do
       v_halved = raw_a1 * @volts_per_count
 
       # Reconstruct the signal
-      # Multiply by 2.0 to reverse the hardware voltage divider
+      # Multiply by 2.0 to reverse the hardware voltage divider I use at the output
+      # of the first op amp mcp6042:
+
       v_op_amp = v_halved * 2.0
 
       # Calculate differential
       # This removes the ~2.0V bias of the reference singal to isolate the sensor signal
-      differential = v_op_amp - v_ref
+      ratio_zero = v_op_amp / v_ref
+      differential = ratio_zero * 2.0 # 2.0 is the nominal reference voltage
 
       # Return a map containing all three calculated values
       {:ok, %{ differential: differential, vref: v_ref, vsensor: v_op_amp }}
@@ -549,13 +564,12 @@ defmodule GasSensor.Sensor do
     # get the correction factor for the look up table
     cf = get_correction_factor(temp)
 
-    # calculate CO using calibrated offset    
-    v_zero = vref + vsensor_offset # note that vsensor_offset comes from a state
-                                   # variable that we can update during the 
-                                   # initial calibration phase of 0 CO ppm
+    # calculate ratio of the 2 values
+    ratio = vsensor / vref 
+    vout = ratio * 2.0 # 2 volts nominal voltage
     
     # calculate delta and alpha according to the data sheet
-    delta = vsensor - v_zero 
+    delta = vout - vsensor_offset 
     alpha = (@sensitivity_na_per_ppm * 1.0e-9) * cf
 
     # Since we can't have "negative" gas, this line ensures that we always 

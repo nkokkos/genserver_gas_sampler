@@ -121,13 +121,13 @@ defmodule GasSensor.Application do
  
       # Start Simulator for dev mode. This should commented during
       # during real production 
-      GasSensorWeb.Simulator.SensorSimulator,
+      # GasSensorWeb.Simulator.SensorSimulator,
    
       # Start the main sensor server. Must be enabled during real production:
-      # { GasSensor.Sensor, [i2c_bus: i2c_bus] }, 
+      { GasSensor.Sensor, [i2c_bus: i2c_bus] }, 
       
       # Start telemetry genserver for data upload:
-      { GasSensor.TelemetryThingsboard, []}
+      #{ GasSensor.TelemetryThingsboard, []}
     ]
 
     opts = [strategy: :one_for_one, name: GasSensor.Supervisor]
