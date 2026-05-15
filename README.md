@@ -15,45 +15,9 @@ for Nerves that separates firmware from business logic, targeting **Raspberry Pi
 genserver_gas_sampler/
 ├── README.md                   # This file
 ├── firmware/                   # Nerves firmware application
-│   ├── lib/
-│   │   ├── firmware.ex
-│   │   └── firmware/
-│   │       └── application.ex  # Supervisor that starts Core + UI
-│   ├── config/
-│   │   ├── config.exs          # Main configuration
-│   │   ├── host.exs            # Host development config
-│   │   └── target.exs          # Target device config (WiFi, I2C)
-│   ├── rootfs_overlay/
-│   │   └── etc/
-│   │       └── iex.exs         # IEx startup configuration
-│   ├── mix.exs                 # Nerves dependencies
-│   └── test/
 ├── gas_sensor/                 # OTP business logic
-│   ├── lib/
-│   │   ├── gas_sensor.ex
-│   │   └── gas_sensor/
-│   │       ├── application.ex  # OTP Application
-│   │       └── sensor.ex       # GenServer for ADC reading
-│   ├── config/
-│   ├── mix.exs
-│   └── test/
-└── ui/              		# Phoenix web interface
-    ├── lib/
-    │   ├── ui/
-    │   │   └── application.ex  # Phoenix OTP Application
-    │   └── ui/
-    │       ├── endpoint.ex     # HTTP endpoint
-    │       ├── router.ex       # Routes
-    │       ├── live/           # LiveView modules
-    │       │   ├── dashboard_live.ex
-    │       │   └── sensor_live.ex
-    │       └── components/     # UI components
-    ├── config/
-    └── mix.exs
+└── gas_sensor_web/             # Phoenix web interface
 ```
-
-## Quick Start
-
 
 ### Upgrade you elixir nerves 
 
@@ -62,7 +26,6 @@ mix local.hex
 mix local.rebar
 mix archive.install hex nerves_bootstrap
 ```
-
 
 ### 1. Build and test the gas sensor library
 
@@ -161,7 +124,7 @@ Key features:
 - Calibrated for specific gas sensor
 - Logging for debugging
 
-### UI Phoenix Application
+### GasSensorWeb Phoenix Application
 
 A lightweight Phoenix web interface that:
 
@@ -200,7 +163,7 @@ Edit `gas_sensor/lib/gas_sensor/sensor.ex` and update these values based on your
 
 ```elixir
 # Sensor calibration constants
-@sensitivity_na_per_ppm 1.827    # nA per ppm (from sensor label/datasheet)
+@sensitivity_na_per_ppm 1.525    # nA per ppm (from sensor label/datasheet)
 @r3_ohms 1_200_000               # Feedback resistor value
 @divider_factor 2.0              # Voltage divider factor
 ```
@@ -235,16 +198,6 @@ Once connected to WiFi, access the web interface:
 # Just call the API:
 ppm = GasSensor.Sensor.get_ppm()
 Logger.info("Current CO level: #{ppm} ppm")
-```
-
-### JSON API
-
-```bash
-# Get current reading
-curl http://<device-ip>/api/readings/current
-
-# Response:
-# {"ppm": 45.32, "status": "ok", "timestamp": "2024-01-15T10:30:00Z"}
 ```
 
 ## Development on Host
@@ -288,6 +241,5 @@ mix phx.server
 
 ## License
 
-
-
 MIT License
+https://opensource.org/license/MIT
