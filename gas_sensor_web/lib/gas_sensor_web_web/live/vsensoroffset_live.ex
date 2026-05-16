@@ -3,24 +3,23 @@ defmodule GasSensorWeb.VsensoroffsetLive do
 
   def mount(_params, _session, socket) do 
    
-   # load configuration from file:
-   vsensor_offset_map   = GasSensor.ConfigManager.get_vsensor_offset()
-   vsensor_offset_value = vsensor_offset_map["vsensor_offset"]
+    # load configuration from file:
+    vsensor_offset_value = GasSensor.ConfigManager.init()
+
     {:ok, 
       socket
-      |> assign(:vsensor_offset, vsensor_offset_value) # Your existing assign
-      |> assign(:error, nil)          # Your existing assign
-      |> assign(:connected, connected?(socket)) # ADD THIS LINE
+      |> assign(:vsensor_offset, vsensor_offset_value) 
+      |> assign(:error, nil) # Your existing assign
+      |> assign(:connected, connected?(socket))
     }
     end
 
   def handle_event("save_settings", %{"vsensor_offset" => value}, socket) do 
     case parse_and_validate(value) do 
       {:ok, value} ->
-        GasSensor.ConfigManager.save_vsensor_offset(value)
-        GasSensor.ReadingAgent.update_vsensor_offset(value)
-		{:noreply, assign(socket, vsensor_offset: value, error: nil)}
-		{:noreply, push_event(socket, "force-reload", %{})}
+      GasSensor.ConfigManager.save_vsensor_offset(value)
+      GasSensor.ReadingAgent.update_vsensor_offset(value)
+      {:noreply, assign(socket, vsensor_offset: value, error: nil)}
 		 
       {:error, message} ->
         {:noreply, assign(socket, error: message)}

@@ -173,8 +173,8 @@ defmodule GasSensorWeb.SensorDetailLive do
 					</div>
 					<div class="flex items-end justify-between">
 					  <div>
-						<div class={["text-7xl font-black mb-2", elem(get_co_status(@current.co_ppm), 2)]}>
-						  <%= Float.round(@current.co_ppm, 1) %>
+						<div class={["text-5xl font-black mb-2", elem(get_co_status(@current.co_ppm), 2)]}>
+						  <%= Float.round(@current.co_ppm, 3) %>
 						</div>
 						<div class="text-2xl text-gray-400">PPM</div>
 					  </div>
@@ -202,15 +202,15 @@ defmodule GasSensorWeb.SensorDetailLive do
 					</div>
 					<div class="flex items-end justify-between">
 					  <div>
-						<div class={["text-7xl font-black mb-2", get_temp_class(@current.temperature_c)]}>
-						  <%= Float.round(@current.temperature_c, 1) %>
+						<div class={["text-5xl font-black mb-2", get_temp_class(@current.temperature_c)]}>
+						  <%= Float.round(@current.temperature_c, 3) %>
 						</div>
 						<div class="text-2xl text-gray-400">°C</div>
 					  </div>
 					  <div class="text-right text-gray-300 text-sm">
 					  <!--	<div><%#= Float.round(@current.temperature_c * 9/5 + 32, 1) %>°F</div> -->
-						<div class="text-3xl text-gray-500 mt-10">RH: <%= Float.round(@current.humidity_rh, 1) %>%</div>
-						<div class="text-3xl text-gray-500">Dew: <%= Float.round(@current.dew_point_c, 1) %>°C</div>
+						<div class="text-2xl text-gray-500 mt-10">RH: <%= Float.round(@current.humidity_rh, 1) %>%</div>
+						<div class="text-2xl text-gray-500">Dew: <%= Float.round(@current.dew_point_c, 1) %>°C</div>
 					  </div>
 					</div>
 				  </div>

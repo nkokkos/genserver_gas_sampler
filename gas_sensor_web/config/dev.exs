@@ -27,14 +27,20 @@ config :gas_sensor_web, GasSensorWeb.Endpoint,
   url: [host: "localhost", port: 3001],
   # Open the door for VirtualBox (0.0.0.0)
   http: [ip: {0, 0, 0, 0}, port: 3001],
+  cache_static_manifest: "priv/static/cache_manifest.json",
   secret_key_base: "im2VAbnBXgHTrb6tJQzsS7w84jbfiMQ6A3jamHvnYiOR10y43E2hcoostekTHXVe",
+  live_view: [signing_salt: "tX+xbzaV"],
+  render_errors: [
+    formats: [html: GasSensorWeb.ErrorHTML, json: GasSensorWeb.ErrorJSON],
+    layout: false
+  ],
   # The LiveView "Glue" (Crucial for Vagrant)
   # What it does: Controls WebSocket/LiveView connection security
   check_origin: false,
   adapter: Bandit.PhoenixAdapter,
   code_reloader: true,
   debug_errors: true,
-  live_view: [signing_salt: "AqXWegTmfeVLuFlZFwnfUYz4c5WZur1VwzjgLKw/xgGGSEVGiLz3ZS4BqTYqdx3a"],
+  pubsub_server: GasSensorWeb.PubSub,
   watchers: []
 
 # Do not include metadata nor timestamps in development logs

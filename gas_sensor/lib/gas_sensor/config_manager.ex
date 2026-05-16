@@ -12,37 +12,47 @@ defmodule GasSensor.ConfigManager do
   
   # load the load file based on configuration.
   @config_file Application.get_env(:gas_sensor, :config)
+  @default_offset 1.0
   
-  @default_offset 0.0
-  @default_config %{"vsensor_offset" => 0.0}
-
   def init() do
     case File.read(@config_file) do
      {:ok, content} -> 
        content 
-       |> Jason.decode!() 
+       |> Jason.decode!()
+       |> Map.get("vsensor_offset", @default_offset)
 
      {:error, :enoent} ->
        File.mkdir_p!(Path.dirname(@config_file))
-       save_vsensor_offset(@default_config)   
-       @default_offset 
+       create_vsensor_offset_file(@default_offset)
+       @default_offset
     end
   end
 
+  def create_vsensor_offset_file(value) do 
+    # build the config using a map and save it to file
+    data = %{"vsensor_offset" => value}
+    json_content = Jason.encode!(data, pretty: true)
+    # this should replace the file:
+    File.write!(@config_file, json_content)
+  end
+  
   def save_vsensor_offset(value) do 
-    # build the config and save it to file
-    config = %{"vsensor_offset" => value}
-    File.write!(@config_file, Jason.encode!(config, pretty: true))
+    File.read!(@config_file)
+    |> Jason.decode!()
+    |> Map.put("vsensor_offset", value)
+    |> then(&File.write!(@config_file, Jason.encode!(&1, pretty: true)))
   end
     
   def get_vsensor_offset do
     case File.read(@config_file) do
       {:ok, content} -> 
-        content 
+        content  
         |> Jason.decode!() 
+        |> Map.get("vsensor_offset", 0.0) # Returns the value, or 0.0 if the key is missing
 
-       {:error, :enoent} ->
-         @default_config
+      {:error, :enoent} ->
+        # Return the default value directly if the file doesn't exist
+        @default_offset
     end
   end
 

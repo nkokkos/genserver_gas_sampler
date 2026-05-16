@@ -303,7 +303,7 @@ defmodule GasSensor.History do
 
   @impl true
   def handle_info(:cleanup, state) do
-    cleanup_old_entries()
+    #cleanup_old_entries()
     schedule_cleanup()
     {:noreply, state}
   end

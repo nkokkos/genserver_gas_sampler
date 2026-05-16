@@ -8,20 +8,6 @@ import Config
 config :gas_sensor_web,
    generators: [timestamp_type: :utc_datetime]
 
-# Configures the endpoint
-config :gas_sensor_web, GasSensorWeb.Endpoint,
-  url: [host: "localhost"],
-  #cache_static_manifest: "priv/static/cache_manifest.json",
-  secret_key_base: "SDr2csjko/PTHvW/YRWIIV4I3LNE8sjyUU9iigvoKW6z+SlnmYdoZ044a26adLBP",
-  adapter: Bandit.PhoenixAdapter,
-  render_errors: [
-    formats: [html: GasSensorWeb.ErrorHTML, json: GasSensorWeb.ErrorJSON],
-    layout: false
-  ],
-  pubsub_server: GasSensorWeb.PubSub,
-  live_view: [signing_salt: "gas_sensor_web_salt"]
-
-
 config :esbuild,
   version: "0.25.4",
   gas_sensor_web: [

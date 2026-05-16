@@ -154,7 +154,7 @@ defmodule GasSensorWeb.SensorHistoryLive do
 				<p class="text-white text-sm mt-1">Raspberry Pi Zero W</p>
 				<div class="flex items-center gap-2 mt-2">
 				  <div class="w-2 h-2 rounded-full bg-green-500"></div>
-				  <!-- <span class="text-green-400 text-xs font-mono">Uptime: 14d 2h</span> -->
+				  <!-- <span class="text-green-400 text-xs font-mono">Uptime..</span> -->
 				</div>
 			  </div>
 			</div>
@@ -172,7 +172,7 @@ defmodule GasSensorWeb.SensorHistoryLive do
 				</div>
 				<p class="text-purple-200 text-sm">Real-time Carbon Monoxide Monitoring</p>
 				<%= if @connected do %>
-				  <p class="text-green-400 text-sm mt-2">● Live • 1s updates</p>
+				  <p class="text-green-400 text-sm mt-2">● Live</p>
 				<% else %>
 				  <p class="text-yellow-400 text-sm mt-2">○ Connecting...</p>
 				<% end %>

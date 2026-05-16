@@ -178,8 +178,8 @@ defmodule GasSensorWeb.SensorVoltsLive do
 					</div>
 					<div class="flex items-end justify-between">
 					  <div>
-						<div class={["text-7xl font-black mb-2", elem(get_co_status(@current.co_ppm), 2)]}>
-						  <%= Float.round(@current.co_ppm, 1) %>
+						<div class={["text-4xl font-black mb-2", elem(get_co_status(@current.co_ppm), 2)]}>
+						  <%= Float.round(@current.co_ppm, 3) %>
 						</div>
 						<div class="text-2xl text-gray-400">PPM</div>
 					  </div>
@@ -207,14 +207,13 @@ defmodule GasSensorWeb.SensorVoltsLive do
 					</div>
 					<div class="flex items-end justify-between">
 					  <div>
-						<div class={["text-7xl font-black mb-2", get_temp_class(@current.vref)]}>
-						  <%= Float.round(@current.vref, 1) %>
+						<div class={["text-4xl font-black mb-2", get_temp_class(@current.vref)]}>
+						  <%= Float.round(@current.vref, 3) %>
 						</div>
 						<div class="text-2xl text-gray-400">Volts</div>
 					  </div>
 					  <div class="text-right text-gray-300 text-sm">
-						<div class="text-2xl text-gray-500 mt-10">Vdifferential: <%= Float.round(@current.vdifferential, 1) %>V</div>
-						<div class="text-2xl text-gray-500">Vsensor_offset: <%= Float.round(@current.vsensor_offset, 1) %>V </div>
+						<div class="text-2xl text-gray-500 mt-10">Vsensor/Vref: <%= Float.round(@current.vdifferential, 3) %></div>
 					  </div>
 					</div>
 				  </div>
@@ -229,10 +228,13 @@ defmodule GasSensorWeb.SensorVoltsLive do
 					</div>
 					<div class="flex items-end justify-between">
 					  <div>
-						<div class={["text-7xl font-black mb-2", get_temp_class(@current.vsensor)]}>
-						  <%= Float.round(@current.vsensor, 1) %>
+						<div class={["text-4xl font-black mb-2", get_temp_class(@current.vsensor)]}>
+						  <%= Float.round(@current.vsensor, 3) %>
 						</div>
-						<div class="text-2xl text-gray-400">Volts</div>
+						<div class="text-2xl text-gray-400">Volts
+                          <div class="text-2xl text-gray-500">Vsensor_offset: <%= Float.round(@current.vsensor_offset, 3) %>V </div>
+						</div>
+                          
 					  </div>
 					  
 					</div>

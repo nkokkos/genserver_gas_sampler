@@ -369,10 +369,9 @@ defmodule GasSensor.Sensor do
       # Calculate differential
       # This removes the ~2.0V bias of the reference singal to isolate the sensor signal
       ratio_zero = v_op_amp / v_ref
-      differential = ratio_zero * 2.0 # 2.0 is the nominal reference voltage
 
       # Return a map containing all three calculated values
-      {:ok, %{ differential: differential, vref: v_ref, vsensor: v_op_amp }}
+      {:ok, %{ differential: ratio_zero, vref: v_ref, vsensor: v_op_amp }}
     else
       {:error, reason} -> {:error, reason}
     end
@@ -565,11 +564,13 @@ defmodule GasSensor.Sensor do
     cf = get_correction_factor(temp)
 
     # calculate ratio of the 2 values
-    ratio = vsensor / vref 
-    vout = ratio * 2.0 # 2 volts nominal voltage
-    
+    ratio_now = vsensor / vref 
+
+    vout   = ratio_now      * 2.0
+    vzero  = vsensor_offset * 2.0
+     
     # calculate delta and alpha according to the data sheet
-    delta = vout - vsensor_offset 
+    delta = vout - vzero 
     alpha = (@sensitivity_na_per_ppm * 1.0e-9) * cf
 
     # Since we can't have "negative" gas, this line ensures that we always 

@@ -14,6 +14,6 @@ cd "../"
 mix deps.get
 mix assets.build
 mix assets.deploy
-mix deps.compile --force
-mix deps.compile gas_sensor --force
+#mix deps.compile --force
+#mix deps.compile gas_sensor --force
 iex -S mix phx.server

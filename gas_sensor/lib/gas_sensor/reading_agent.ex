@@ -63,7 +63,7 @@ defmodule GasSensor.ReadingAgent do
     
     # Update the existing parameter copied over from the 
     # module attribute
-    initial_state = %{@default_reading | vsensor_offset: config["vsensor_offset"]}
+    initial_state = %{@default_reading | vsensor_offset: config}
 
     Agent.start_link(fn -> initial_state end, name: @agent_name)
   end

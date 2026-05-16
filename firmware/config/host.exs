@@ -22,14 +22,18 @@ config :gas_sensor_web, GasSensorWeb.Endpoint,
   http: [ip: {0,0,0,0}, port: 3001],
   cache_static_manifest: "priv/static/cache_manifest.json",
   secret_key_base: "im2VAbnBXgHTrb6tJQzsS7w84jbfiMQ6A3jamHvnYiOR10y43E2hcoostekTHXVe",
-  live_view: [signing_salt: "AqXWegTmfeVLuFlZFwnfUYz4c5WZur1VwzjgLKw/xgGGSEVGiLz3ZS4BqTYqdx3a"],
+  live_view: [signing_salt: "tX+xbzaV"]
+  render_errors: [
+    formats: [html: GasSensorWeb.ErrorHTML, json: GasSensorWeb.ErrorJSON],
+    layout: false
+  ],
   check_origin: false,
   # Start the server since we're running in a release instead of through `mix`
   server: true,
   render_errors: [view: GasSensorWeb.ErrorView, accepts: ~w(html json), layout: false],
   pubsub_server: GasSensorWeb.PubSub,
   # Nerves root filesystem is read-only, so disable the code reloader
-  code_reloader: false,
+  code_reloader: true,
   check_origin: false,
   adapter: Bandit.PhoenixAdapter
 
