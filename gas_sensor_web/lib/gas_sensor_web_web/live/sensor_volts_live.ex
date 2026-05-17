@@ -5,16 +5,18 @@ defmodule GasSensorWeb.SensorVoltsLive do
   """
   use GasSensorWeb, :live_view
 
-  @current_refresh 1_000   # 1 second
-  @history_refresh 5_000   # 5 seconds
-  @history_seconds 300     # 5 minutes
-  @history_1_minute 60     # 1 minute
+  @current_refresh 15_000 # 15 seconds
+  @history_refresh 15_000 # 15 seconds
+
+  @history_seconds 300    # 5 minutes
+  @history_10_minutes 600 # 10 minute
+
   @impl true
   def mount(_params, _session, socket) do
     if connected?(socket) do
       :timer.send_interval(@current_refresh, self(), :update_current)
       :timer.send_interval(@history_refresh, self(), :update_history)
-      :timer.send_interval(@history_refresh, self(), :update_history_1_minute)
+      :timer.send_interval(@history_refresh, self(), :update_history_10_minutes)
     end
 
     {:ok,
@@ -22,7 +24,7 @@ defmodule GasSensorWeb.SensorVoltsLive do
      |> assign(:current, get_current())
      |> assign(:history, get_history())
      |> assign(:current_time, get_reliable_timestamp())
-     |> assign(:history_1_minute, get_history_1_minute())
+     |> assign(:history_10_minutes, get_history_10_minutes())
      |> assign(:connected, connected?(socket))}
   end
 
@@ -37,8 +39,8 @@ defmodule GasSensorWeb.SensorVoltsLive do
   end
 
   @impl true
-  def handle_info(:update_history_1_minute, socket) do
-    {:noreply, assign(socket, :history_1_minute, get_history_1_minute())}
+  def handle_info(:update_history_10_minutes, socket) do
+    {:noreply, assign(socket, :history_10_minutes, get_history_10_minutes())}
   end
   
   #this reads from the agent
@@ -60,9 +62,9 @@ defmodule GasSensorWeb.SensorVoltsLive do
     end)
   end
   
-  defp get_history_1_minute do 
+  defp get_history_10_minutes do 
    {now, _} = GasSensor.Timestamp.now_with_reliability()
-    cutoff = DateTime.add(now, -@history_1_minute, :second)
+    cutoff = DateTime.add(now, -@history_10_minutes, :second)
     
     GasSensor.History.get_since(cutoff)
     |> Enum.map(fn reading ->
@@ -250,9 +252,9 @@ defmodule GasSensorWeb.SensorVoltsLive do
 				<div class="relative bg-slate-800 rounded-2xl p-8">
 				  <div class="flex items-center justify-between mb-6">
 					<div>
-					  <h2 class="text-white text-2xl font-bold">1 Minute Trend</h2>
+					  <h2 class="text-white text-2xl font-bold">15-Minutes Trend</h2>
 					  <p class="text-purple-300 text-sm mt-1">
-						<%= length(@history_1_minute) %> data points • Updates every 5s
+						<%= length(@history_10_minutes) %> data points • Updates every 15s
 					  </p>
 					</div>
 					<div class="flex gap-4 text-sm">
@@ -271,12 +273,12 @@ defmodule GasSensorWeb.SensorVoltsLive do
 					  <canvas 
 						 id="sensorChart_volts" 
 						 phx-hook="SensorChart_volts" 
-						 class={if length(@history_1_minute) == 0, do: "hidden", else: ""}
-						 data-history-volts={Jason.encode!(@history_1_minute)} 
+						 class={if length(@history_10_minutes) == 0, do: "hidden", else: ""}
+						 data-history-volts={Jason.encode!(@history_10_minutes)} 
 						 phx-update="ignore">
 					   </canvas>
 					 </div>
-					 <%= if length(@history_1_minute) == 0 do %>
+					 <%= if length(@history_10_minutes) == 0 do %>
 					   <div class="text-center py-12 text-gray-400">
 						 <p class="text-lg">📊 Collecting data...</p>
 					   </div>

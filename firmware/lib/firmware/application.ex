@@ -100,6 +100,14 @@ defmodule Firmware.Application do
         shutdown: 500                            # Give it 500ms to clean up on exit
       },
 
+      # Start the Network monitor genserver that checks for network disconnections
+      %{ 
+         id: Firmware.NetworkMonitor,
+         start: {Firmware.NetworkMonitor, :start_link, ["Hello NetworkMonitor"] }, # the message passed will be ignored
+         type: :worker,
+         restart: :permanent,
+         shutdown: 500
+       }
     ]
 
   opts = [strategy: :one_for_one, name: Firmware.Supervisor]
